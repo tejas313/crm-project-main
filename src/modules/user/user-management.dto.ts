@@ -31,6 +31,20 @@ export class ManagerDto {
   @IsEmail()
   @IsNotEmpty()
   email: string;
+
+  @ApiProperty({ example: "1234567890", required: false })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiProperty({
+    example: "SecurePass123!",
+    required: false,
+    description: "Password (optional, auto-generated if not provided)",
+  })
+  @IsOptional()
+  @IsString()
+  password?: string;
 }
 
 export class AgentDto {
@@ -57,6 +71,20 @@ export class AgentDto {
   @IsEmail()
   @IsNotEmpty()
   email: string;
+
+  @ApiProperty({ example: "9876543210", required: false })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiProperty({
+    example: "SecurePass123!",
+    required: false,
+    description: "Password (optional, auto-generated if not provided)",
+  })
+  @IsOptional()
+  @IsString()
+  password?: string;
 
   @ApiProperty({ example: 1, description: "ID of the manager" })
   @IsNumber()

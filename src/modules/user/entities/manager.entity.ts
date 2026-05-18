@@ -20,6 +20,9 @@ export class Manager {
   @Column({ length: 255, unique: true, type: "varchar" })
   email: string;
 
+  @Column({ name: "phone", length: 20, type: "varchar", nullable: true })
+  phone: string;
+
   @Column({ name: "is_deleted", type: "smallint", width: 6, default: 0 })
   is_deleted: number;
   // Reference: project_dbml

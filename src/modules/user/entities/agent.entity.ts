@@ -26,6 +26,9 @@ export class Agent {
   @Column({ length: 255, unique: true, type: "varchar" })
   email: string;
 
+  @Column({ name: "phone", length: 20, type: "varchar", nullable: true })
+  phone: string;
+
   @Column({ name: "fk_manager_id", type: "integer" })
   fk_manager_id: number;
 

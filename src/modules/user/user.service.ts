@@ -155,6 +155,36 @@ export class UserService {
     return { success: true };
   }
 
+  private async checkPhoneAvailability(
+    phone: string,
+    currentUserId?: number,
+    entityType?: "manager" | "agent"
+  ): Promise<{ success: boolean; message?: string }> {
+    // Check managers table
+    const managerQuery =
+      currentUserId && entityType === "manager"
+        ? { phone, id: Not(currentUserId), is_deleted: 0 }
+        : { phone, is_deleted: 0 };
+    const existingManager = await this.managerRepository.findOne({
+      where: managerQuery,
+    });
+    if (existingManager)
+      return { success: false, message: "PHONE_ALREADY_EXISTS" };
+
+    // Check agents table
+    const agentQuery =
+      currentUserId && entityType === "agent"
+        ? { phone, id: Not(currentUserId), is_deleted: 0 }
+        : { phone, is_deleted: 0 };
+    const existingAgent = await this.agentRepository.findOne({
+      where: agentQuery,
+    });
+    if (existingAgent)
+      return { success: false, message: "PHONE_ALREADY_EXISTS" };
+
+    return { success: true };
+  }
+
   async login(loginDto: LoginDto) {
     try {
       const { email, password } = loginDto;
@@ -284,6 +314,18 @@ export class UserService {
         if (!emailCheck.success) return emailCheck;
       }
 
+      // Check phone number if provided
+      if (dto.phone) {
+        if (!currentManager || dto.phone !== currentManager.phone) {
+          const phoneCheck = await this.checkPhoneAvailability(
+            dto.phone,
+            dto.id,
+            "manager"
+          );
+          if (!phoneCheck.success) return phoneCheck;
+        }
+      }
+
       let savedManager: Manager;
       if (dto.id) {
         // Edit mode
@@ -304,6 +346,23 @@ export class UserService {
             await this.userRepository.save(user);
           }
         }
+
+        // Update password if provided
+        if (dto.password) {
+          const user = await this.userRepository.findOne({
+            where: { role: UserRole.MANAGER, role_id: dto.id },
+          });
+          if (user) {
+            const saltRounds = parseInt(
+              this.configService.get("SALT_ROUND") || "10",
+              10
+            );
+            const salt = await bcrypt.genSalt(saltRounds);
+            user.password = await bcrypt.hash(dto.password, salt);
+            user.password_changed_at = new Date();
+            await this.userRepository.save(user);
+          }
+        }
       } else {
         // Add mode
         const manager = this.managerRepository.create(dto);
@@ -316,8 +375,9 @@ export class UserService {
           10
         );
         const salt = await bcrypt.genSalt(saltRounds);
-        const generatedPassword = this.commonService.generateSecurePassword();
-        user.password = await bcrypt.hash(generatedPassword, salt);
+        // Use provided password or generate a secure one
+        const passwordToUse = dto.password || this.commonService.generateSecurePassword();
+        user.password = await bcrypt.hash(passwordToUse, salt);
         user.role = UserRole.MANAGER;
         user.role_id = savedManager.id;
         await this.userRepository.save(user);
@@ -361,6 +421,18 @@ export class UserService {
         if (!emailCheck.success) return emailCheck;
       }
 
+      // Check phone number if provided
+      if (dto.phone) {
+        if (!currentAgent || dto.phone !== currentAgent.phone) {
+          const phoneCheck = await this.checkPhoneAvailability(
+            dto.phone,
+            dto.id,
+            "agent"
+          );
+          if (!phoneCheck.success) return phoneCheck;
+        }
+      }
+
       let savedAgent: Agent;
       if (dto.id) {
         // Edit mode
@@ -380,6 +452,23 @@ export class UserService {
             await this.userRepository.save(user);
           }
         }
+
+        // Update password if provided
+        if (dto.password) {
+          const user = await this.userRepository.findOne({
+            where: { role: UserRole.AGENT, role_id: dto.id },
+          });
+          if (user) {
+            const saltRounds = parseInt(
+              this.configService.get("SALT_ROUND") || "10",
+              10
+            );
+            const salt = await bcrypt.genSalt(saltRounds);
+            user.password = await bcrypt.hash(dto.password, salt);
+            user.password_changed_at = new Date();
+            await this.userRepository.save(user);
+          }
+        }
       } else {
         // Add mode
         const agent = this.agentRepository.create(dto);
@@ -392,8 +481,10 @@ export class UserService {
           10
         );
         const salt = await bcrypt.genSalt(saltRounds);
-        const generatedPassword = this.commonService.generateSecurePassword();
-        user.password = await bcrypt.hash(generatedPassword, salt);
+        // Use provided password or generate a secure one
+        const passwordToUse =
+          dto.password || this.commonService.generateSecurePassword();
+        user.password = await bcrypt.hash(passwordToUse, salt);
         user.role = UserRole.AGENT;
         user.role_id = savedAgent.id;
         await this.userRepository.save(user);
