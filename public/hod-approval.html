@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    >
+    <title>Return Order HOD Approval</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    >
+    <style>
+      :root {
+        --bg-1: #fff5f7;
+        --bg-2: #f9e9ef;
+        --ink: #2b1b24;
+        --muted: #6f5863;
+        --accent: #a11e75;
+        --accent-2: #c12f86;
+        --ok: #7a6a78;
+        --card: #ffffff;
+        --shadow: 0 24px 50px rgba(78, 35, 63, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, #ffffff 0%, #fff7f9 35%, #fff1f6 100%);
+        min-height: 100vh;
+      }
+
+      .page {
+        width: 100%;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 18px 36px;
+        background: #ffffff;
+        border-bottom: 1px solid #f3d5e1;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand img {
+        height: 44px;
+        width: auto;
+        display: block;
+      }
+
+      .nav {
+        display: inline-flex;
+        gap: 18px;
+        font-weight: 600;
+        color: var(--ink);
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .nav span {
+        position: relative;
+        padding-bottom: 6px;
+      }
+
+      .nav .active {
+        color: var(--accent);
+      }
+
+      .nav .active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 2px;
+        background: var(--accent);
+        border-radius: 4px;
+      }
+
+      .container {
+        padding: 28px 36px 36px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f6dfe9;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #6f3c5a;
+        margin-top: 6px;
+      }
+
+      .card {
+        background: #fdeff2;
+        border-radius: 12px;
+        padding: 24px;
+        border: 1px solid #f3d5e1;
+        display: grid;
+        gap: 20px;
+      }
+
+      .title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .title h2 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 700;
+      }
+
+      .order-id {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        background: #f9edf2;
+        padding: 6px 10px;
+        border-radius: 6px;
+      }
+
+      .field label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .thankyou {
+        display: none;
+        padding: 18px;
+        border-radius: 12px;
+        background: #f6dfe9;
+        color: #6f3c5a;
+        font-weight: 600;
+      }
+
+      .thankyou.visible {
+        display: block;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 140px;
+        resize: vertical;
+        border-radius: 10px;
+        border: 1px solid #ead1df;
+        padding: 12px 14px;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.5;
+        background: #ffffff;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      button {
+        border: none;
+        border-radius: 6px;
+        padding: 14px 16px;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      }
+
+      .approve {
+        background: linear-gradient(135deg, #a11e75, #c12f86);
+        color: #ffffff;
+        box-shadow: 0 12px 30px rgba(161, 30, 117, 0.3);
+      }
+
+      .reject {
+        background: #111111;
+        color: #ffffff;
+        box-shadow: 0 12px 30px rgba(17, 17, 17, 0.3);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        box-shadow: none;
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+      }
+
+      .status {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--muted);
+        min-height: 20px;
+      }
+
+      .status.ok {
+        color: var(--ok);
+      }
+
+      .status.err {
+        color: #c0392b;
+      }
+
+      .note {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 900px) {
+        .header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .nav {
+          margin-left: 0;
+          margin-right: 0;
+        }
+
+        .container {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div class="brand">
+          <img src="/public/LogoHeader.svg" alt="LifeCell Biologics">
+        </div>
+      </header>
+
+      <div class="container">
+        <section class="card">
+        <div class="title">
+          <h2>HOD Return Order Approval</h2>
+          <div class="order-id" id="orderId">Return ID: --</div>
+        </div>
+        <div class="chip" id="statusChip">Return Order - HOD Review</div>
+
+        <div class="thankyou" id="thankyouMsg">
+          Thank you. This return order has already been processed.
+        </div>
+
+        <div id="formSection">
+          <div class="field">
+            <label for="remark">Remark (required for reject)</label>
+            <textarea
+              id="remark"
+              placeholder="Add a short reason or note for your decision..."
+            ></textarea>
+          </div>
+
+          <div class="actions">
+            <button class="approve" id="approveBtn">Approve</button>
+            <button class="reject" id="rejectBtn">Reject</button>
+          </div>
+
+          <div class="status" id="statusMsg"></div>
+          <div class="note">
+            This action is final. If already processed, the system will notify you.
+          </div>
+        </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        const returnId = params.get("return_id");
+        const orderId = params.get("order_id");
+        const referenceCode = params.get("reference_code");
+        const orderIdEl = document.getElementById("orderId");
+        const statusEl = document.getElementById("statusMsg");
+        const statusChip = document.getElementById("statusChip");
+        const remarkEl = document.getElementById("remark");
+        const approveBtn = document.getElementById("approveBtn");
+        const rejectBtn = document.getElementById("rejectBtn");
+
+        if (orderId) {
+          orderIdEl.textContent = "Order ID: " + orderId;
+        } else if (returnId) {
+          orderIdEl.textContent = "Return ID: " + returnId;
+        } else {
+          statusEl.textContent = "Missing order_id or return_id in the URL.";
+          statusEl.className = "status err";
+          approveBtn.disabled = true;
+          rejectBtn.disabled = true;
+          return;
+        }
+
+        async function submitDecision(status) {
+          statusEl.textContent = "Submitting...";
+          statusEl.className = "status";
+          approveBtn.disabled = true;
+          rejectBtn.disabled = true;
+
+          const remark = remarkEl.value.trim();
+          if (status === 2 && !remark) {
+            statusEl.textContent = "Remark is required for rejection.";
+            statusEl.className = "status err";
+            approveBtn.disabled = false;
+            rejectBtn.disabled = false;
+            return;
+          }
+
+          try {
+            const res = await fetch("/v1/admin/returnOrderHodApprovalStatus", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                return_id: returnId,
+                order_id: orderId,
+                reference_code: referenceCode,
+                status: status,
+                remark: remark,
+              }),
+            });
+
+            const data = await res.json();
+            if (res.ok && data && data.status === "SUCCESS") {
+              statusEl.textContent = data.message || "Saved.";
+              statusEl.className = "status ok";
+              const resolvedStatus =
+                data?.data?.hod_approve === 1
+                  ? 1
+                  : data?.data?.hod_approve === 2
+                    ? 2
+                    : status;
+              statusChip.textContent =
+                resolvedStatus === 1 ? "Status: Approved" : "Status: Rejected";
+              approveBtn.disabled = true;
+              rejectBtn.disabled = true;
+            } else {
+              statusEl.textContent =
+                (data && data.message) || "Request failed.";
+              statusEl.className = "status err";
+              approveBtn.disabled = false;
+              rejectBtn.disabled = false;
+            }
+          } catch (err) {
+            statusEl.textContent = "Network error. Please try again.";
+            statusEl.className = "status err";
+            approveBtn.disabled = false;
+            rejectBtn.disabled = false;
+          }
+        }
+
+        approveBtn.addEventListener("click", function () {
+          submitDecision(1);
+        });
+
+        rejectBtn.addEventListener("click", function () {
+          submitDecision(2);
+        });
+
+        // Ensure Approve is on the right
+        const actions = document.querySelector(".actions");
+        if (actions && approveBtn && rejectBtn) {
+          actions.appendChild(approveBtn);
+          actions.prepend(rejectBtn);
+        }
+
+        async function loadStatus() {
+          const statusUrl = new URL(
+            "/v1/admin/returnOrderHodApprovalStatus",
+            window.location.origin
+          );
+          if (orderId && referenceCode) {
+            statusUrl.searchParams.set("order_id", orderId);
+            statusUrl.searchParams.set("reference_code", referenceCode);
+          } else if (returnId) {
+            statusUrl.searchParams.set("return_id", returnId);
+          } else {
+            return;
+          }
+
+          try {
+            const res = await fetch(statusUrl.toString(), { method: "GET" });
+            const data = await res.json();
+            if (res.ok && data && data.status === "SUCCESS") {
+              const hodApprove = data?.data?.hod_approve;
+              if (hodApprove === 1 || hodApprove === 2) {
+                const thankyou = document.getElementById("thankyouMsg");
+                const formSection = document.getElementById("formSection");
+                if (formSection) formSection.style.display = "none";
+                if (thankyou) thankyou.classList.add("visible");
+                statusChip.textContent =
+                  hodApprove === 1 ? "Status: Approved" : "Status: Rejected";
+              }
+            }
+          } catch (err) {
+            // ignore status preload errors
+          }
+        }
+
+        loadStatus();
+      })();
+    </script>
+  </body>
+</html>
+

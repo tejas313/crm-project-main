@@ -1,0 +1,15 @@
+{
+  "en": {
+    "LOGIN_SUCCESS": "Login successful",
+    "INVALID_CREDENTIALS": "Invalid email or password",
+    "USER_NOT_FOUND": "User not found",
+    "SOMETHING_WENT_WRONG": "Something went wrong",
+    "PASSWORD_CHANGED_SUCCESS": "Password changed successfully",
+    "INVALID_OLD_PASSWORD": "Old password is incorrect",
+    "USER_CREATED_SUCCESS": "User created successfully",
+    "USER_UPDATED_SUCCESS": "User updated successfully",
+    "EMAIL_ALREADY_EXISTS": "Email already exists",
+    "MANAGER_NOT_FOUND": "Manager not found",
+    "FORBIDDEN_ACCESS": "You do not have permission to perform this action"
+  }
+}
