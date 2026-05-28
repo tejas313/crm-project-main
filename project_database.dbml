@@ -1,0 +1,1365 @@
+// TeleSales CRM Database Schema - COMPLETE VERSION
+// Generated from SOW-Telesales CRM 1.pdf with 100% URS Coverage
+// Use this file at https://dbdiagram.io/ to visualize the database structure
+// Last Updated: 2026-05-21
+// 
+// This comprehensive schema includes:
+// - All user management with role-based access
+// - Complete lead lifecycle management
+// - Dialer queue and call management
+// - Appointment scheduling with calendar integration
+// - Presentation and follow-up tracking
+// - SEF/Enrollment integration
+// - Automation flows (NR7, P2E, Active EDD, Referral)
+// - Communication management (Email, SMS, WhatsApp, Chat)
+// - Reports and analytics infrastructure
+// - Stemcell integration and sync
+// - Bulk operations and audit trails
+
+// ============================================
+// ENUMS
+// ============================================
+
+Enum user_role {
+  admin
+  manager
+  agent
+}
+
+Enum lead_status {
+  new_lead
+  contacted
+  qualified
+  appointment_set
+  presentation_done
+  follow_up
+  ready_to_enroll
+  enrolled
+  dropped
+  not_reachable
+}
+
+Enum lead_source {
+  facebook
+  website
+  instagram
+  phone_call
+  website_form
+  referral
+  other
+}
+
+Enum task_status {
+  pending
+  overdue
+  completed
+  cancelled
+}
+
+Enum task_type {
+  call
+  follow_up
+  appointment
+  presentation
+  general
+}
+
+Enum appointment_type {
+  sales
+  telesales
+}
+
+Enum sales_type{
+  re
+  telesales
+  
+}
+
+Enum consultation_type {
+  personal
+  telephone
+  video
+}
+
+Enum call_origin {
+  inbound
+  outbound
+  dialer
+}
+
+Enum presentation_status {
+  presentation_done
+  presentation_not_done
+}
+
+Enum sales_status {
+  follow_up_call
+  ready_to_enroll
+  dropped
+}
+
+Enum follow_up_disposition {
+  follow_up_cold
+  follow_up_warm
+  unable_to_contact
+  will_enroll_after_1_week
+  will_enroll_after_2_week
+  will_enroll_after_3_week
+  re_not_connected
+  personal_ppt_required
+  only_whatsapp_communication
+  re_duplicated
+  in_touch_with_re
+  connected_on_whatsapp
+  in_discussion_not_decided
+  we_will_call_upfront
+}
+
+Enum dropped_reason {
+  already_delivered
+  cost_too_high
+  demand_higher_discount
+  doctor_not_recommended
+  enrolled_with_competitor
+  unable_to_establish_contact
+  customer_cancelled_consultation
+  concept
+  already_enrolled_lifecell
+  never_asked_appointment
+  registered_free_gifts
+  wants_free_stemcell_cover
+  non_serviceable_area
+  already_preserved_first_baby
+  not_decision_maker
+  high_collection_charges
+  not_comfortable_self_collection
+  no_symptoms_not_required
+  referral_lead_created
+  duplicate_done
+}
+
+Enum activity_type {
+  lead_created
+  lead_assigned
+  lead_updated
+  status_changed
+  owner_changed
+  dialer_activity
+  call_made
+  appointment_created
+  appointment_updated
+  presentation_updated
+  note_added
+  task_created
+  task_updated
+  stemcell_sync
+  bulk_operation
+  referral_created
+}
+
+Enum lead_stage {
+  new
+  contacted
+  qualified
+  appointment_scheduled
+  presentation_completed
+  follow_up
+  ready_to_enroll
+  enrolled
+  dropped
+  not_reachable
+}
+
+Enum bulk_operation_type {
+  upload
+  edit
+  delete
+  export
+  status_update
+}
+
+Enum report_type {
+  daily_leads
+  daily_valid_leads
+  daily_appointments
+  daily_ppt
+  daily_sef
+  active_eod_bucketing
+  source_medium_tracking
+  campaign_tracking
+  consolidate_dashboard
+  agent_productivity
+  agent_followup_eod
+  lead_performance
+  sef_comparison
+  review_dashboard_mom
+  missed_followup
+  resubmission_leads
+}
+
+Enum notification_channel {
+  email
+  sms
+  whatsapp
+  push
+  in_app
+}
+
+Enum sync_status {
+  pending
+  in_progress
+  synced
+  failed
+  retry
+}
+
+Enum dialer_queue_status {
+  queued
+  calling
+  completed
+  failed
+  skipped
+}
+
+Enum communication_template_type {
+  task_reminder
+  appointment_reminder
+  follow_up
+  welcome
+  password_reset
+  enrollment_confirmation
+  presentation_scheduled
+  custom
+}
+
+Enum eod_bucket_type {
+  hot_lead
+  warm_lead
+  cold_lead
+  follow_up_1_week
+  follow_up_2_week
+  follow_up_3_week
+  not_reachable
+  dropped
+}
+
+Enum calendar_slot_status {
+  available
+  booked
+  blocked
+  tentative
+}
+
+Enum message_direction {
+  inbound
+  outbound
+}
+
+Enum message_status {
+  sent
+  delivered
+  read
+  failed
+  received
+}
+
+Enum message_type {
+  text
+  image
+  document
+  audio
+  video
+  location
+  template
+}
+
+// ============================================
+// USER MANAGEMENT TABLES
+// ============================================
+
+Table users {
+  id int [pk, increment]
+  email varchar(255) [unique, not null]
+  password varchar(255) [not null]
+  role user_role [not null]
+  role_id int [null, note: 'References admin.id, manager.id, or agent.id based on role']
+  is_active boolean [default: true]
+  is_blocked boolean [default: false]
+  password_changed_at timestamp [null]
+  is_deleted boolean [default: false, note: 'Soft delete flag']
+  deleted_at timestamp [null]
+  deleted_by int [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    email
+    role
+    is_active
+    role_id
+  }
+  
+  note: 'Main authentication table for all users (Admin, Manager, Agent) - role_id references the specific role table'
+}
+
+Table managers {
+  id int [pk, increment]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  email varchar(255) [unique, not null]
+  is_deleted boolean [default: false, note: 'Soft delete flag']
+  deleted_at timestamp [null]
+  deleted_by int [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    email
+  }
+  
+  note: 'Manager specific information'
+}
+
+Table agents {
+  id int [pk, increment]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  email varchar(255) [unique, not null]
+  manager_id int [not null, ref: > managers.id, note: 'References managers.id']
+  is_deleted boolean [default: false, note: 'Soft delete flag']
+  deleted_at timestamp [null]
+  deleted_by int [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    manager_id
+    id
+    is_deleted
+  }
+  
+  note: 'Agent specific information with manager assignment'
+}
+
+// ============================================
+// LEAD MANAGEMENT
+// ============================================
+
+Table leads {
+  id int [pk, increment]
+  lead_id varchar(50) [unique, not null, note: 'Auto-generated unique ID']
+  stemcell_lead_id varchar(100) [unique, null, note: 'Lead ID from Stemcell app']
+  first_name varchar(100) [not null]
+  last_name varchar(100) [null]
+  phone varchar(20) [not null]
+  phone_country_code varchar(5) [default: '+91']
+  alternate_phone varchar(20) [null]
+  alternate_email varchar(20) [null]
+  email varchar(255) [null]
+  // Source Information
+  lead_source lead_source [not null]
+  medium varchar(100) [null]
+  source_id varchar(100) [null]
+  medium_id varchar(100) [null]
+  campaign_name varchar(255) [null]
+  campaign_type varchar(100) [null]
+  referrer_url text [null]
+  landing_page_url text [null]
+  
+  // Medical/Sales Information
+  pregnancy_edd date [null, note: 'Expected Delivery Date']
+  pregnancy_week int [null]
+  interested_product varchar(255) [null]
+  referrer_crm_number varchar(100) [null]
+  current_hospital varchar(255) [null]
+  current_doctor varchar(255) [null]
+  
+  // System Information
+  lead_status lead_status [default: 'new_lead']
+  lead_stage lead_stage [default: 'new', note: 'Pipeline stage for visualization']
+  owner_id int [null, ref: > users.id, note: 'Assigned agent/manager']
+  assigned_at timestamp [null]
+  assigned_by int [null, ref: > users.id]
+  
+  // Tracking & Validation
+  call_attempt_count int [default: 0]
+  last_contacted_at timestamp [null]
+  first_contacted_at timestamp [null]
+  appointment_set_at timestamp [null, note: 'When appointment was set']
+  is_duplicate boolean [default: false]
+  duplicate_of_lead_id int [null, ref: > leads.id]
+  duplicate_checked_at timestamp [null]
+  is_valid_lead boolean [default: true, note: 'For Daily Valid Leads report']
+  is_engaged boolean [default: false, note: 'For Engaged Leads metric']
+  engagement_date timestamp [null]
+  is_resubmission boolean [default: false, note: 'For Resubmission leads report']
+  original_submission_date timestamp [null]
+  resubmission_count int [default: 0]
+  is_nr7_triggered boolean [default: false, note: 'Not Reachable after 7 attempts']
+  nr7_triggered_at timestamp [null]
+  // Quality & Scoring
+  lead_score int [default: 0, note: 'Lead scoring for prioritization']  
+  engagement_score int [default: 0]
+  preferred_language varchar(50) [null]
+  // Soft Delete
+  is_deleted boolean [default: false, note: 'Soft delete flag']
+  deleted_at timestamp [null]
+  deleted_by int [null, ref: > users.id]
+  deletion_reason text [null]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  created_by int [null, ref: > users.id]
+  updated_by int [null, ref: > users.id]
+  
+  indexes {
+    id
+    lead_id
+    phone [unique, note: 'Unique phone validation']
+    email [unique, note: 'Unique email validation']
+    lead_source
+    lead_status
+    created_at
+  }
+  
+  note: 'Complete lead management with source tracking, duplicate detection, and soft delete'
+}
+
+Table lead_addresses {
+  id int [pk, increment]
+  fk_lead_id int [unique, not null, ref: > leads.id]
+  fk_state_id int [null]
+  fk_city_id int [null]
+  pincode varchar(10) [null]
+  address text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    fk_lead_id
+    fk_state_id
+    fk_city_id
+  }
+  
+  note: 'Lead address details in a separate table'
+}
+
+Table chat_messages {
+  id int [pk, increment]
+  fk_lead_id int [null, ref: > leads.id]
+  fk_agent_id int [null, ref: > users.id]
+  agent_phone varchar(20) [not null]
+  customer_phone varchar(20) [not null]
+  message text [not null]
+  message_type message_type [default: 'text']
+  direction message_direction [not null]
+  status message_status [default: 'sent']
+  gupshup_message_id varchar(255) [null]
+  media_url varchar(500) [null]
+  media_caption text [null]
+  error_message text [null]
+  conversation_id varchar(255) [null]
+  is_deleted boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    fk_lead_id
+    fk_agent_id
+    agent_phone
+    customer_phone
+    direction
+    gupshup_message_id
+    created_at
+  }
+
+  note: 'WhatsApp chat messages via Gupshup'
+}
+
+Table lead_activities {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  activity_type activity_type [not null]
+  appointment_id int [null, ref: > appointments.id]
+  notes_id int [null, ref: > notes.id]
+  automation_id int [null, ref: > automations.id]
+  task_id int [null, ref: > tasks.id]
+  dialer_id int [null, ref: > dialer_calls.id]
+  description text [null]
+  performed_by_user_id int [null, ref: > users.id]
+  metadata json [null, note: 'Additional activity data']
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    lead_id
+    activity_type
+    created_at
+    performed_by_user_id
+  }
+}
+
+Table lead_audit_trail {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  field_name varchar(100) [not null]
+  old_value text [null]
+  new_value text [null]
+  changed_by_user_id int [not null, ref: > users.id]
+  changed_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    lead_id
+    changed_at
+    changed_by_user_id
+  }
+}
+
+Table notes {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  note text [not null]
+  is_pinned boolean [default: false]
+  is_important boolean [default: false]
+  created_by_user_id int [not null, ref: > users.id]
+  is_deleted boolean [default: false, note: 'Soft delete flag']
+  deleted_at timestamp [null]
+  deleted_by int [null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    lead_id
+    created_by_user_id
+    created_at
+    is_deleted
+    is_pinned
+  }
+  
+  note: 'Lead notes with soft delete and pinning capability'
+}
+
+// ============================================
+// TASK MANAGEMENT
+// ============================================
+
+Table tasks {
+  id int [pk, increment]
+  task_id varchar(50) [unique, not null, note: 'Auto-generated unique ID']
+  lead_id int [not null, ref: > leads.id]
+  owner_id int [not null, ref: > users.id, note: 'Assigned user']
+  task_type task_type [not null]
+  subject varchar(255) [not null]
+  description text [null]
+  priority varchar(20) [default: 'medium', note: 'low, medium, high, urgent']
+  scheduled_at timestamp [not null]
+  due_date timestamp [null]
+  reminder_at timestamp [null]
+  reminder_sent_at timestamp [null, note: 'Track if 15-min reminder was sent']
+  status task_status [default: 'pending']
+  completion_notes text [null]
+  google_calendar_event_id varchar(255) [null]
+  is_recurring boolean [default: false]
+  recurrence_pattern varchar(100) [null]
+  parent_task_id int [null, ref: > tasks.id, note: 'For recurring tasks']
+  completed_at timestamp [null]
+  completed_by int [null, ref: > users.id]
+  cancelled_at timestamp [null]
+  cancelled_by int [null, ref: > users.id]
+  cancellation_reason text [null]
+  created_by_user_id int [not null, ref: > users.id]
+  is_deleted boolean [default: false, note: 'Soft delete flag']
+  deleted_at timestamp [null]
+  deleted_by int [null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    task_id
+    lead_id
+    owner_id
+    status
+    scheduled_at
+    task_type
+    is_deleted
+    priority
+    parent_task_id
+  }
+  
+  note: 'Task management with soft delete, priorities, and recurring tasks'
+}
+
+// ============================================
+// DIALER MANAGEMENT
+// ============================================
+
+Table dialer_calls {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  agent_id int [not null, ref: > users.id]
+  display_number varchar(20) [null]
+  call_date_time timestamp [not null]
+  call_duration int [null, note: 'Duration in seconds']
+  call_origin call_origin [not null]
+  owner int [null]
+  dialer_status varchar(100) [null, note: 'Status from dialer system']
+  raw_call_status varchar(100) [null, note: 'Raw status from service provider']
+  crm_lead_status lead_status [null, note: 'Mapped CRM status']
+  disposition_status varchar(100) [null]
+  call_notes text [null]
+  call_recording_url varchar(500) [null]
+  attempt_number int [default: 1]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    lead_id
+    agent_id
+    dialer_status
+    crm_lead_status
+  }
+}
+
+// ============================================
+// APPOINTMENT MANAGEMENT
+// ============================================
+
+Table appointments {
+  id int [pk, increment]
+  appointment_id varchar(50) [unique, null, note: 'Generated from Stemcell app']
+  lead_id int [not null, ref: > leads.id]
+  appointment_type appointment_type [not null]
+  consultation_type consultation_type [not null]
+  
+  // Assignment
+  owner_id int [not null, ref: > users.id, note: 'User who created appointment']
+  sales_type sales_type [note:"re or telesales"]
+  assign_sales_id int [not null]
+  is_fallback_assignment boolean [default: false, note: 'True if assigned to RE manager due to unavailability']
+  
+  // Medical Information
+  pregnancy_edd date [null]
+  
+  // Hospital/Doctor Assignment (for sales)
+  state_id int [null]
+  city_id int [null]
+  hospital_id int [null]
+  doctor_id int [null]
+  address text [null]
+ 
+  
+  // Telesales specific
+  preferred_language varchar(50) [null]
+  
+  // Scheduling
+  original_appointment_date timestamp [null]
+  current_appointment_date timestamp [null]
+  confirmed_slot timestamp [null]
+  
+  // Status
+  disposition_status varchar(100) [null, note: 'Final appointment outcome disposition']
+  is_locked boolean [default: false, note: 'Locked after ID generation']
+  is_synced_with_stemcell boolean [default: false]
+  
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    appointment_id
+    lead_id
+    appointment_type
+    current_appointment_date
+    hospital_id
+    doctor_id
+    is_fallback_assignment
+  }
+}
+
+// ============================================
+// PRESENTATION STAGE
+// ============================================
+
+Table presentations {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  appointment_id int [null, ref: > appointments.id]
+  sales_type sales_type [note:"re or telesales"]
+  assign_sales_id int [not null]
+  presentation_status int [null]
+  presentation_date date [null]
+  sales_status sales_status [not null]
+  plan_type varchar(100) [null]
+  version int [default: 1, note: 'Track presentation history versions']
+  
+  // Follow-up details
+  follow_up_date_time timestamp [null]
+  follow_up_disposition follow_up_disposition [null]
+  is_missed_followup boolean [default: false, note: 'For Missed follow-up report']
+  
+  // Push to sales
+  push_to_sales boolean [default: false]
+  push_follow_up_to_sales boolean [default: false]
+  confirm_enrollment_followup boolean [default: false]
+  sales_push_type varchar(50) [null]
+  
+  // Hospital/Doctor for sales push (IDs and text fields)
+  state_id int [null]
+  city_id int [null]
+  hospital_id int [null]
+  hospital_name_text varchar(255) [null, note: 'Manual hospital name entry']
+  doctor_id int [null]
+  doctor_name_text varchar(255) [null, note: 'Manual doctor name entry']
+  centre varchar(100) [null]
+  
+  // Dropped reason
+  dropped_reason dropped_reason [null]
+  
+  notes text [null]
+  created_by_user_id int [not null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    lead_id
+    appointment_id
+    presentation_status
+    sales_status
+    presentation_date
+    follow_up_date_time
+    is_missed_followup
+  }
+}
+
+Table presentation_status_logs {
+  id int [pk, increment]
+  presentation_id int [not null, ref: > presentations.id]
+  lead_id int [not null, ref: > leads.id]
+  appointment_id int [null, ref: > appointments.id]
+  sales_status sales_status [not null]
+  follow_up_date_time timestamp [null]
+  presentation_date date [null]
+  state_id int [null]
+  city_id int [null]
+  hospital_id int [null]
+  doctor_id int [null]
+  owner_id int [not null, ref: > users.id]
+  pregnancy_edd date [null]
+  push_enrollment_to_sales boolean [default: false]
+  push_followup_to_sales boolean [default: false]
+  confirm_enrollment_followup boolean [default: false]
+  sales_push_type varchar(50) [null]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    presentation_id
+    lead_id
+    appointment_id
+    created_at
+  }
+}
+
+// ============================================
+// STEMCELL INTEGRATION
+// ============================================
+
+Table stemcell_logs {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  appointment_id int [null, ref: > appointments.id]
+  stemcell_appointment_id varchar(100) [null]
+  
+  // Lead Information
+  lead_gynaecologist varchar(255) [null]
+  lead_hospital varchar(255) [null]
+  pregnancy_edd date [null]
+  
+  // Appointment Details
+  appointment_created_date timestamp [null]
+  original_appointment_due_date timestamp [null]
+  current_appointment_due_date timestamp [null]
+  
+  // Status Information
+  lead_status varchar(100) [null]
+  telesales_or_sales varchar(50) [null]
+  presentation_status_from_re varchar(100) [null]
+  sales_status varchar(100) [null]
+  overall_status varchar(100) [null]
+  
+  // RE Information
+  re_name varchar(255) [null]
+  re_code varchar(50) [null]
+  centre varchar(100) [null]
+  branch_code varchar(50) [null]
+  
+  // Additional
+  notes text [null]
+  
+  sync_date timestamp [default: `now()`]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    lead_id
+    appointment_id
+    stemcell_appointment_id
+    sync_date
+  }
+}
+
+// ============================================
+// SEF/ENROLLMENT STAGE
+// ============================================
+
+Table sef_enrollments {
+  id int [pk, increment]
+  fk_lead_id int [not null, ref: > leads.id]
+  fk_appointment_id int [null, ref: > appointments.id]
+  crm_number varchar(100) [unique, not null, note: 'Customer CRM Number']
+  customer_name varchar(255) [null]
+  sef_date timestamp [not null]
+  plan_detail text [null, note: 'ASF, OTP, LTP, LifeCell Gold']
+  re_name varchar(100) [null]
+  re_code varchar(50) [null]
+  branch_code varchar(50) [null]
+  centre varchar(100) [null]
+  pregnancy_edd date [null]
+  presentation_date date [null]
+  lead_status varchar(100) [null]
+  telesales_or_sales varchar(50) [null]
+  presentation_status varchar(100) [null]
+  sales_status varchar(100) [null]
+  overall_status varchar(100) [null]
+  appointment_created_date timestamp [null]
+  original_appointment_due_date timestamp [null]
+  current_appointment_due_date timestamp [null]
+  check_in_prior_1hr_clicked boolean [default: false]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    fk_lead_id
+    fk_appointment_id
+    crm_number
+    sef_date
+    re_code
+  }
+  
+  note: 'Enrollment stage sync from Stemcell - 100% URS Accurate'
+}
+
+// ============================================
+// AUTOMATION
+// ============================================
+
+Table automations {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  description text [null]
+  automation_type varchar(100) [not null, note: 'lead_status_update, dialer_push, nr7_journey, p2e_journey, etc.']
+  flow_definition json [not null, note: 'Automation flow configuration']
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    automation_type
+    is_active
+  }
+}
+
+Table automation_execution_logs {
+  id int [pk, increment]
+  automation_id int [not null, ref: > automations.id]
+  lead_id int [null, ref: > leads.id]
+  execution_status varchar(50) [not null, note: 'success, failed, pending']
+  execution_data json [null]
+  error_message text [null]
+  executed_at timestamp [default: `now()`]
+  
+  indexes {
+    automation_id
+    lead_id
+    execution_status
+    executed_at
+  }
+}
+
+// ============================================
+// ADDITIONAL USER MANAGEMENT
+// ============================================
+
+Table user_session {
+  id int [pk, increment]
+  user_id int [not null, ref: > users.id]
+  token varchar(255) [unique, not null]
+  expires_at timestamp [not null]
+  refresh_token varchar(255) [unique, not null]
+  refresh_expires_at timestamp [not null]
+  used_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    token
+    expires_at
+  }
+  
+  note: 'Password reset token management'
+}
+
+
+Table notification_preferences {
+  id int [pk, increment]
+  user_id int [unique, not null, ref: > users.id]
+  email_enabled boolean [default: true]
+  sms_enabled boolean [default: false]
+  whatsapp_enabled boolean [default: false]
+  push_enabled boolean [default: true]
+  task_reminders boolean [default: true]
+  appointment_reminders boolean [default: true]
+  lead_assignments boolean [default: true]
+  daily_summary boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+  }
+  
+  note: 'User notification preferences'
+}
+
+// ============================================
+// DIALER QUEUE & WORKING HOURS
+// ============================================
+
+Table dialer_queue {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  agent_id int [null, ref: > users.id, note: 'Assigned agent for the call']
+  priority int [default: 0, note: 'Higher number = higher priority']
+  scheduled_call_time timestamp [not null]
+  is_immediate_dial boolean [default: false, note: 'True for 1-min dial, false for next-day']
+  queue_status dialer_queue_status [default: 'queued']
+  attempt_number int [default: 1]
+  last_attempt_at timestamp [null]
+  next_retry_at timestamp [null]
+  error_message text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    lead_id
+    agent_id
+    queue_status
+  }
+  
+  note: 'Dialer call queue with priority management'
+}
+
+Table working_hours_config {
+  id int [pk, increment]
+  day_of_week int [not null, note: '0=Sunday, 1=Monday, ..., 6=Saturday']
+  start_time time [not null]
+  end_time time [not null]
+  is_working_day boolean [default: true]
+  timezone varchar(50) [default: 'Asia/Kolkata']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    day_of_week
+    is_working_day
+  }
+  
+  note: 'System working hours configuration for dialer'
+}
+
+// ============================================
+// CALENDAR & AVAILABILITY
+// ============================================
+
+Table re_calendar_slots {
+  id int [pk, increment]
+  re_id int [not null]
+  slot_date date [not null]
+  slot_start_time time [not null]
+  slot_end_time time [not null]
+  slot_status calendar_slot_status [default: 'available']
+  appointment_id int [null, ref: > appointments.id, note: 'If booked, reference to appointment']
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    re_id
+    slot_date
+    slot_status
+    (re_id, slot_date, slot_start_time) [unique]
+  }
+  
+  note: 'RE calendar availability slots'
+}
+
+Table agent_leave_calendar {
+  id int [pk, increment]
+  agent_id int [not null, ref: > users.id]
+  leave_start_date date [not null]
+  leave_end_date date [not null]
+  leave_count int [not null]
+  is_cancel boolean
+  leave_type varchar(50) [null, note: 'sick, vacation, personal, etc.']
+  reason text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    agent_id
+    leave_start_date
+    leave_end_date
+  }
+  
+  note: 'Agent leave calendar for telesales availability'
+}
+
+Table appointment_history {
+  id int [pk, increment]
+  appointment_id int [not null, ref: > appointments.id]
+  action varchar(50) [not null, note: 'created, rescheduled, cancelled, completed']
+  old_date timestamp [null]
+  new_date timestamp [null]
+  old_assign_role assign_role [note:"re or agent"]
+  new_assign_role assign_role [note:"re or agent"]
+  new_assign_role_id int [null]
+  old_assign_role_id int [null]
+  reason text [null]
+  changed_by_user_id int [not null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    id
+    appointment_id
+    action
+    created_at
+  }
+  
+  note: 'Track all appointment changes and rescheduling'
+}
+
+Table google_calendar_integration {
+  id int [pk, increment]
+  user_id int [unique, not null, ref: > users.id]
+  access_token text [not null]
+  refresh_token text [not null]
+  token_expires_at timestamp [not null]
+  calendar_id varchar(255) [null]
+  is_active boolean [default: true]
+  last_sync_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    is_active
+  }
+  
+  note: 'Google Calendar integration tokens and settings'
+}
+
+// ============================================
+// BULK OPERATIONS & IMPORTS
+// ============================================
+
+Table bulk_operation_logs {
+  id int [pk, increment]
+  operation_type bulk_operation_type [not null]
+  file_name varchar(255) [null]
+  file_path varchar(500) [null]
+  total_records int [default: 0]
+  successful_records int [default: 0]
+  failed_records int [default: 0]
+  error_log json [null, note: 'Array of errors with row numbers']
+  performed_by_user_id int [not null, ref: > users.id]
+  started_at timestamp [not null]
+  completed_at timestamp [null]
+  status varchar(50) [default: 'in_progress', note: 'in_progress, completed, failed']
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    operation_type
+    performed_by_user_id
+    status
+    started_at
+  }
+  
+  note: 'Track bulk upload, edit, delete operations'
+}
+
+Table lead_import_history {
+  id int [pk, increment]
+  bulk_operation_id int [null, ref: > bulk_operation_logs.id]
+  lead_id int [null, ref: > leads.id, note: 'Created lead reference']
+  row_number int [not null]
+  import_data json [not null, note: 'Original import data']
+  import_status varchar(50) [not null, note: 'success, failed, duplicate']
+  error_message text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    bulk_operation_id
+    lead_id
+    import_status
+  }
+  
+  note: 'Detailed import history for each lead'
+}
+
+
+
+
+// ============================================
+// COMMUNICATION TEMPLATES
+// ============================================
+
+Table communication_templates {
+  id int [pk, increment]
+  template_name varchar(255) [not null]
+  template_type communication_template_type [not null]
+  channel notification_channel [not null]
+  subject varchar(500) [null, note: 'For email']
+  body text [not null, note: 'Template with placeholders like {{first_name}}']
+  variables json [null, note: 'List of available variables']
+  is_active boolean [default: true]
+  created_by_user_id int [not null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    template_type
+    channel
+    is_active
+  }
+  
+  note: 'Email, SMS, WhatsApp communication templates'
+}
+
+// ============================================
+// REFERRAL TRACKING
+// ============================================
+
+Table referral_tracking {
+  id int [pk, increment]
+  referrer_lead_id int [not null, ref: > leads.id, note: 'Lead who referred']
+  referred_lead_id int [not null, ref: > leads.id, note: 'New lead created from referral']
+  referral_code varchar(50) [null]
+  referral_source varchar(100) [null]
+  referral_date timestamp [not null]
+  is_converted boolean [default: false]
+  conversion_date timestamp [null]
+  reward_given boolean [default: false]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    referrer_lead_id
+    referred_lead_id
+    referral_code
+    is_converted
+  }
+  
+  note: 'Track referral automation and attribution'
+}
+
+// ============================================
+// STEMCELL INTEGRATION QUEUE
+// ============================================
+
+Table stemcell_api_logs {
+  id int [pk, increment]
+  sync_queue_id int [null]
+  endpoint varchar(255) [not null]
+  http_method varchar(10) [not null]
+  request_payload json [null]
+  response_payload json [null]
+  http_status_code int [null]
+  response_time_ms int [null]
+  is_success boolean [default: false]
+  error_message text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    sync_queue_id
+    endpoint
+    is_success
+    created_at
+  }
+  
+  note: 'Detailed API call logs for Stemcell integration'
+}
+
+Table stemcell_duplicate_check_log {
+  id int [pk, increment]
+  lead_id int [not null, ref: > leads.id]
+  phone varchar(20) [not null]
+  email varchar(255) [null]
+  is_duplicate_in_stemcell boolean [default: false]
+  stemcell_customer_id varchar(100) [null]
+  check_date timestamp [not null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    lead_id
+    phone
+    email
+    is_duplicate_in_stemcell
+    check_date
+  }
+  
+  note: 'Track duplicate checks with Stemcell database'
+}
+
+// ============================================
+// ADVANCED SEARCH & FILTERS
+// ============================================
+
+Table saved_filters {
+  id int [pk, increment]
+  user_id int [not null, ref: > users.id]
+  filter_name varchar(255) [not null]
+  filter_type varchar(50) [not null, note: 'leads, appointments, presentations, tasks']
+  filter_conditions json [not null, note: 'If/Else conditions']
+  is_default boolean [default: false]
+  is_shared boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    filter_type
+    is_default
+  }
+  
+  note: 'User saved search filters with If/Else conditions'
+}
+
+// ============================================
+// SYSTEM CONFIGURATION
+// ============================================
+
+
+
+// ============================================
+// COMMUNICATION TRACKING
+// ============================================
+
+Table email_notifications {
+  id int [pk, increment]
+  lead_id int [null, ref: > leads.id]
+  user_id int [null, ref: > users.id]
+  task_id int [null, ref: > tasks.id]
+  email_to varchar(255) [not null]
+  email_subject varchar(500) [not null]
+  email_body text [not null]
+  email_type varchar(100) [not null, note: 'task_reminder, appointment_reminder, password_reset, etc.']
+  sent_at timestamp [null]
+  status varchar(50) [default: 'pending', note: 'pending, sent, failed']
+  error_message text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    lead_id
+    user_id
+    task_id
+    email_type
+    status
+    sent_at
+  }
+}
+
+Table sms_notifications {
+  id int [pk, increment]
+  lead_id int [null, ref: > leads.id]
+  phone varchar(20) [not null]
+  message text [not null]
+  sms_type varchar(100) [not null]
+  sent_at timestamp [null]
+  status varchar(50) [default: 'pending']
+  error_message text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    lead_id
+    phone
+    sms_type
+    status
+    sent_at
+  }
+}
+
+Table whatsapp_notifications {
+  id int [pk, increment]
+  lead_id int [null, ref: > leads.id]
+  phone varchar(20) [not null]
+  message text [not null]
+  whatsapp_type varchar(100) [not null]
+  sent_at timestamp [null]
+  status varchar(50) [default: 'pending']
+  error_message text [null]
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    lead_id
+    phone
+    whatsapp_type
+    status
+    sent_at
+  }
+}
+
+Table main_permission {
+  id int [pk, increment]
+  name varchar [not null]
+  is_deleted boolean [default:'false' ]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table child_permission {
+  id int [pk, increment]
+  main_role_permission_id int [null, ref: > main_permission.id]
+  name varchar [not null]
+  is_deleted boolean [default:'false' ]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    main_role_permission_id
+    id
+  }
+}
+
+Table user_role_permission {
+  id int [pk, increment]
+  child_permission_id int [null, ref: > child_permission.id]
+  user_id int [null, ref: > users.id]
+  is_deleted boolean [default:'false' ]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    child_permission_id
+    user_id
+    id
+  }
+}

@@ -54,10 +54,9 @@ export class ResponseService {
 
   getMessage(msg: string, language: string) {
     const lang = language ? language : "en";
-  
+
     return messages[lang][msg] || msg;
     return messages[lang][msg] || messages[lang]["SOMETHING_WENT_WRONG"];
-
   }
 
   async errorInventoy(req: any, res: any, msg: any, statusCode = 500) {

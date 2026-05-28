@@ -19,20 +19,20 @@ export class SmsNotification {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "fk_lead_id", nullable: true })
+  @Column({ name: "fk_lead_id", nullable: true, type: "integer" })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead)
+  @ManyToOne(() => Lead, { onDelete: "SET NULL" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
-  @Column({ name: "phone", length: 20 })
+  @Column({ name: "phone", length: 20, nullable: false })
   phone: string;
 
-  @Column({ name: "message", type: "text" })
+  @Column({ name: "message", type: "text", nullable: false })
   message: string;
 
-  @Column({ name: "sms_type", length: 100 })
+  @Column({ name: "sms_type", length: 100, nullable: false })
   sms_type: string;
 
   @Column({ name: "sent_at", type: "timestamp", nullable: true })

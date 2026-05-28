@@ -12,6 +12,7 @@ import {
   ExpressAdapter,
   NestExpressApplication,
 } from "@nestjs/platform-express";
+import { IoAdapter } from "@nestjs/platform-socket.io";
 import { SwaggerConfig } from "./config/swagger.config";
 import { resolve } from "path";
 
@@ -36,6 +37,9 @@ async function bootstrap() {
   app.useStaticAssets(resolve("public"));
   app.useStaticAssets("public", { prefix: "/public" });
   app.use(json({ limit: "150mb" }));
+
+  // Enable WebSocket adapter for Socket.IO (Chat feature)
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   app.setGlobalPrefix("v1");
 
