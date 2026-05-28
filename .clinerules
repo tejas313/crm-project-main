@@ -1,0 +1,56 @@
+Always analyze URS before coding.
+
+Never directly implement without:
+1. Flow analysis
+2. Actor analysis
+3. DB design
+4. API sequence
+5. Edge case detection
+
+Architecture Rules:
+- NestJS modular architecture
+- SOLID principles
+- Repository pattern
+- DTO validation
+- Strict typing
+- No any types
+
+Backend Rules:
+- Controller → Service → Repository flow
+- No business logic in controller
+- Centralized error handling
+- Transaction support
+- Queue isolation
+
+Database Rules:
+- Proper indexes
+- Foreign keys
+- Optimized queries
+- Transaction handling
+
+Queue Rules:
+- BullMQ
+- Retry mechanism
+- Dead letter queue
+- Separate workers
+
+Security Rules:
+- JWT auth
+- Role guards
+- Validation pipes
+
+Workflow Rules:
+- Explain flow before coding
+- Ask clarification for ambiguity
+- Never assume hidden business logic
+
+Code Quality:
+- Production-ready only
+- No tutorial code
+- No mock implementations
+- No placeholder logic
+
+Response Rules:
+- Structured responses
+- Flow-wise explanation
+- Step-by-step implementation

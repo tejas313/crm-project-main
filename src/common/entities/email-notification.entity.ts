@@ -22,37 +22,37 @@ export class EmailNotification {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "fk_lead_id", nullable: true })
+  @Column({ name: "fk_lead_id", nullable: true, type: "integer" })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead)
+  @ManyToOne(() => Lead, { onDelete: "SET NULL" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
-  @Column({ name: "fk_user_id", nullable: true })
+  @Column({ name: "fk_user_id", nullable: true, type: "integer" })
   fk_user_id: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "SET NULL" })
   @JoinColumn({ name: "fk_user_id" })
   user: User;
 
-  @Column({ name: "fk_task_id", nullable: true })
+  @Column({ name: "fk_task_id", nullable: true, type: "integer" })
   fk_task_id: number;
 
-  @ManyToOne(() => Task)
+  @ManyToOne(() => Task, { onDelete: "SET NULL" })
   @JoinColumn({ name: "fk_task_id" })
   task: Task;
 
-  @Column({ name: "email_to", length: 255 })
+  @Column({ name: "email_to", length: 255, nullable: false })
   email_to: string;
 
-  @Column({ name: "email_subject", length: 500 })
+  @Column({ name: "email_subject", length: 500, nullable: false })
   email_subject: string;
 
-  @Column({ name: "email_body", type: "text" })
+  @Column({ name: "email_body", type: "text", nullable: false })
   email_body: string;
 
-  @Column({ name: "email_type", length: 100 })
+  @Column({ name: "email_type", length: 100, nullable: false })
   email_type: string;
 
   @Column({ name: "sent_at", type: "timestamp", nullable: true })

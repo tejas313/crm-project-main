@@ -12,18 +12,18 @@ import { Lead } from "../../lead/entities/lead.entity";
 import { User } from "../../user/entities/user.entity";
 
 export enum TaskStatus {
-  PENDING = "Pending",
-  OVERDUE = "Overdue",
-  COMPLETED = "Completed",
-  CANCELLED = "Cancelled",
+  PENDING = "pending",
+  OVERDUE = "overdue",
+  COMPLETED = "completed",
+  CANCELLED = "cancelled",
 }
 
 export enum TaskType {
-  CALL = "Call",
-  FOLLOW_UP = "Follow up",
-  APPOINTMENT = "Appointment",
-  PRESENTATION = "Presentation",
-  GENERAL = "General",
+  CALL = "call",
+  FOLLOW_UP = "follow_up",
+  APPOINTMENT = "appointment",
+  PRESENTATION = "presentation",
+  GENERAL = "general",
 }
 
 @Entity("tasks")
@@ -156,4 +156,14 @@ export class Task {
 
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
+
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "modify_by" })
+  modifyByUser: User;
 }

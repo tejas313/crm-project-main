@@ -14,11 +14,12 @@ import { UserService } from "./user.service";
 import { LoginDto } from "./login.dto";
 import { ChangePasswordDto } from "./change-password.dto";
 import {
-  ManagerDto,
-  AgentDto,
   AgentLeaveDto,
   LeaveListDto,
-  AddUserPermissionsDto,
+  AddRolePermissionsDto,
+  AddOrEditUserDto,
+  UserListFiltersDto,
+  UserByIdDto,
 } from "./user-management.dto";
 import { ResponseService } from "../../common/response.service";
 import { Request, Response } from "express";
@@ -102,13 +103,16 @@ export class UserController {
     }
   }
 
-  // Manager Management (Common Add or Edit)
-  @Post("add-or-edit-manager")
+  // Unified Add or Edit User (Manager or Agent)
+  @Post("add-or-edit-user")
   @UseGuards(AuthGuard)
   @ApiHeader({ name: "authorizations", required: true })
-  @ApiOperation({ summary: "Add or Edit Manager (Admin only)" })
-  async addOrEditManager(
-    @Body() dto: ManagerDto,
+  @ApiOperation({
+    summary:
+      "Add or Edit User - Unified endpoint for Manager and Agent (Admin only)",
+  })
+  async addOrEditUser(
+    @Body() dto: AddOrEditUserDto,
     @Req() req: any,
     @Res() res: Response
   ) {
@@ -116,7 +120,7 @@ export class UserController {
       if (req.user.role !== UserRole.ADMIN) {
         return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
       }
-      const result = await this.userService.addOrEditManager(dto);
+      const result = await this.userService.addOrEditUser(dto);
 
       return this.responseService.success(res, result.message, result);
     } catch (error: any) {
@@ -128,39 +132,13 @@ export class UserController {
     }
   }
 
-  // Agent Management (Common Add or Edit)
-  @Post("add-or-edit-agent")
-  @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
-  @ApiOperation({ summary: "Add or Edit Agent (Admin only)" })
-  async addOrEditAgent(
-    @Body() dto: AgentDto,
-    @Req() req: any,
-    @Res() res: Response
-  ) {
-    try {
-      if (req.user.role !== UserRole.ADMIN) {
-        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
-      }
-      const result = await this.userService.addOrEditAgent(dto);
-
-      return this.responseService.success(res, result.message, result);
-    } catch (error: any) {
-      if (error.status) {
-        this.responseService.error(req, res, error.message, error.status);
-      } else {
-        this.responseService.error(req, res, error.message);
-      }
-    }
-  }
-
-  // Add or Update User Permissions
+  // Add or Update Role Permissions
   @Post("add-permissions")
   @UseGuards(AuthGuard)
   @ApiHeader({ name: "authorizations", required: true })
-  @ApiOperation({ summary: "Add or Update User Permissions (Admin only)" })
+  @ApiOperation({ summary: "Add or Update Role Permissions (Admin only)" })
   async addPermissions(
-    @Body() dto: AddUserPermissionsDto,
+    @Body() dto: AddRolePermissionsDto,
     @Req() req: any,
     @Res() res: Response
   ) {
@@ -169,7 +147,7 @@ export class UserController {
         return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
       }
       const performedBy = req.user.userId;
-      const result = await this.userService.addOrUpdateUserPermissions(
+      const result = await this.userService.addOrUpdateRolePermissions(
         dto,
         performedBy
       );
@@ -196,8 +174,170 @@ export class UserController {
   ) {
     try {
       const userId = req.user.userId;
-      const result = await this.userService.addLeave(userId, dto);
+      const agentId = req.user.role_id;
+      const result = await this.userService.addLeave(userId, agentId, dto);
 
+      return this.responseService.success(res, result.message, result);
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Get("user-list")
+  @UseGuards(AuthGuard)
+  @ApiHeader({ name: "authorizations", required: true })
+  @ApiOperation({
+    summary: "Get User List with pagination, filters, and counts (Admin only)",
+  })
+  async getUserList(
+    @Query() query: UserListFiltersDto,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
+    try {
+      if (req.user.role !== UserRole.ADMIN) {
+        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
+      }
+      const result = await this.userService.getUserList(query);
+      return this.responseService.success(
+        res,
+        "User list retrieved successfully",
+        result
+      );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Get("userDetailsbyId")
+  @UseGuards(AuthGuard)
+  @ApiHeader({ name: "authorizations", required: true })
+  @ApiOperation({ summary: "Get User Details by ID (Admin only)" })
+  async getUserDetailsById(
+    @Query("id") id: string,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
+    try {
+      if (req.user.role !== UserRole.ADMIN) {
+        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
+      }
+      const result = await this.userService.getUserDetailsById(Number(id));
+      return this.responseService.success(
+        res,
+        "User details retrieved successfully",
+        result
+      );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Get("permissionList")
+  @UseGuards(AuthGuard)
+  @ApiHeader({ name: "authorizations", required: true })
+  @ApiOperation({
+    summary: "Get Hierarchical List of Permissions (Admin only)",
+  })
+  async getPermissionList(@Req() req: any, @Res() res: Response) {
+    try {
+      if (req.user.role !== UserRole.ADMIN) {
+        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
+      }
+      const result = await this.userService.getPermissionList();
+      return this.responseService.success(
+        res,
+        "Permission list retrieved successfully",
+        result
+      );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Get("userRolePermissions")
+  @UseGuards(AuthGuard)
+  @ApiHeader({ name: "authorizations", required: true })
+  @ApiOperation({ summary: "Get User Role Permissions (Admin only)" })
+  async getUserRolePermissions(
+    @Query("id") id: string,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
+    try {
+      if (req.user.role !== UserRole.ADMIN) {
+        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
+      }
+      const result = await this.userService.getUserRolePermissions(Number(id));
+      return this.responseService.success(
+        res,
+        "User role permissions retrieved successfully",
+        result
+      );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Post("block-unblock")
+  @UseGuards(AuthGuard)
+  @ApiHeader({ name: "authorizations", required: true })
+  @ApiOperation({ summary: "Block or Unblock User (Admin only)" })
+  async blockUnblockUser(
+    @Body() dto: UserByIdDto,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
+    try {
+      if (req.user.role !== UserRole.ADMIN) {
+        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
+      }
+      const result = await this.userService.blockUnblockUser(dto);
+      return this.responseService.success(res, result.message, result);
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Post("delete")
+  @UseGuards(AuthGuard)
+  @ApiHeader({ name: "authorizations", required: true })
+  @ApiOperation({ summary: "Delete User (Admin only)" })
+  async deleteUser(
+    @Body() dto: UserByIdDto,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
+    try {
+      if (req.user.role !== UserRole.ADMIN) {
+        return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
+      }
+      const deletedByUserId = req.user.userId;
+      const result = await this.userService.deleteUser(dto, deletedByUserId);
       return this.responseService.success(res, result.message, result);
     } catch (error: any) {
       if (error.status) {
@@ -218,10 +358,10 @@ export class UserController {
     @Res() res: Response
   ) {
     try {
-      const userId = req.user.userId;
+      const roleId = req.user.role_id;
       const role = req.user.role;
 
-      const result = await this.userService.getLeaveList(userId, role, query);
+      const result = await this.userService.getLeaveList(roleId, role, query);
 
       return this.responseService.success(
         res,

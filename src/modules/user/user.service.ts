@@ -6,10 +6,18 @@ import { UserSession } from "./entities/user-session.entity";
 import { Manager } from "./entities/manager.entity";
 import { Agent } from "./entities/agent.entity";
 import { AgentLeaveCalendar } from "./entities/agent-leave-calendar.entity";
+import { RoleDetails } from "./entities/role-details.entity";
+import { Module } from "./entities/module.entity";
+import { ModulePermission } from "./entities/module-permission.entity";
+import { RolePermission } from "./entities/role-permission.entity";
 import { LoginDto } from "./login.dto";
 import { ChangePasswordDto } from "./change-password.dto";
-import { ManagerDto, AgentDto, AgentLeaveDto } from "./user-management.dto";
-import { UserRolePermission } from "./entities/user-role-permission.entity";
+import {
+  AgentLeaveDto,
+  AddOrEditUserDto,
+  UserListFiltersDto,
+  UserByIdDto,
+} from "./user-management.dto";
 import * as bcrypt from "bcrypt";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
@@ -22,47 +30,53 @@ export class UserService {
     private userRepository: Repository<User>,
     @InjectRepository(UserSession)
     private userSessionRepository: Repository<UserSession>,
-    @InjectRepository(UserRolePermission)
-    private userRolePermissionRepository: Repository<UserRolePermission>,
     @InjectRepository(Manager)
     private managerRepository: Repository<Manager>,
     @InjectRepository(Agent)
     private agentRepository: Repository<Agent>,
     @InjectRepository(AgentLeaveCalendar)
     private agentLeaveCalendarRepository: Repository<AgentLeaveCalendar>,
+    @InjectRepository(RolePermission)
+    private rolePermissionRepository: Repository<RolePermission>,
+    @InjectRepository(RoleDetails)
+    private roleDetailsRepository: Repository<RoleDetails>,
+    @InjectRepository(Module)
+    private moduleRepository: Repository<Module>,
+    @InjectRepository(ModulePermission)
+    private modulePermissionRepository: Repository<ModulePermission>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private commonService: CommonService
   ) {}
 
-  // Add or update user permissions
-  async addOrUpdateUserPermissions(dto: any, performedByUserId?: number) {
+  // Add or update role permissions
+  async addOrUpdateRolePermissions(dto: any, performedByUserId?: number) {
     try {
-      const { fk_user_id, permissions } = dto;
+      const { role_details_id, module_permission_id } = dto;
 
       // Basic validation
-      if (!Array.isArray(permissions)) {
+      if (!Array.isArray(module_permission_id)) {
         return { success: false, message: "INVALID_PERMISSIONS_PAYLOAD" };
       }
 
-      // Validate user exists
-      const user = await this.userRepository.findOne({
-        where: { id: fk_user_id, is_deleted: 0 },
+      // Validate role exists
+      const role = await this.roleDetailsRepository.findOne({
+        where: { id: role_details_id, is_deleted: 0 },
       });
-      if (!user) return { success: false, message: "USER_NOT_FOUND" };
+      if (!role) return { success: false, message: "ROLE_NOT_FOUND" };
 
-      // Fetch all permissions rows for this user (including deleted ones)
-      const existingRows = await this.userRolePermissionRepository.find({
-        where: { fk_user_id },
+      // Fetch all permissions rows for this role (including deleted ones)
+      const existingRows = await this.rolePermissionRepository.find({
+        where: { role_details_id },
       });
 
       const existingMap = new Map<number, any>();
       for (const row of existingRows)
-        existingMap.set(row.fk_child_permission_id, row);
+        existingMap.set(row.module_permission_id, row);
 
       // Normalize incoming permissions (unique numbers)
       const incomingPerms = Array.from(
-        new Set(permissions.map((p: any) => Number(p)))
+        new Set(module_permission_id.map((p: any) => Number(p)))
       );
       const incomingSet = new Set(incomingPerms);
 
@@ -77,8 +91,8 @@ export class UserService {
           toCreate.push(perm);
         } else if (existing.is_deleted && Number(existing.is_deleted) === 1) {
           existing.is_deleted = 0;
-          existing.deleted_at = null;
-          existing.fk_deleted_by = null;
+          existing.modify_at = new Date();
+          existing.modify_by_id = performedByUserId || null;
           toReactivate.push(existing);
         }
       }
@@ -87,11 +101,11 @@ export class UserService {
       for (const row of existingRows) {
         if (
           (!row.is_deleted || Number(row.is_deleted) === 0) &&
-          !incomingSet.has(row.fk_child_permission_id)
+          !incomingSet.has(row.module_permission_id)
         ) {
           row.is_deleted = 1;
-          row.deleted_at = new Date();
-          row.fk_deleted_by = performedByUserId || null;
+          row.modify_at = new Date();
+          row.modify_by_id = performedByUserId || null;
           toDelete.push(row);
         }
       }
@@ -99,20 +113,19 @@ export class UserService {
       // Persist changes
       if (toCreate.length) {
         const created = toCreate.map((perm) =>
-          this.userRolePermissionRepository.create({
-            fk_user_id,
-            fk_child_permission_id: perm,
+          this.rolePermissionRepository.create({
+            role_details_id,
+            module_permission_id: perm,
+            created_by_id: performedByUserId || null,
           })
         );
-        await this.userRolePermissionRepository.save(created);
+        await this.rolePermissionRepository.save(created);
       }
 
-      if (toReactivate.length)
-        await this.userRolePermissionRepository.save(toReactivate);
-      if (toDelete.length)
-        await this.userRolePermissionRepository.save(toDelete);
+      if (toReactivate.length) await this.rolePermissionRepository.save(toReactivate);
+      if (toDelete.length) await this.rolePermissionRepository.save(toDelete);
 
-      return { success: true, message: "PERMISSIONS_UPDATED" };
+      return { success: true, message: "ROLE_PERMISSIONS_UPDATED" };
     } catch (error) {
       throw error;
     }
@@ -120,67 +133,40 @@ export class UserService {
 
   private async checkEmailAvailability(
     email: string,
-    currentUserId?: number,
-    entityType?: "manager" | "agent"
+    currentUserId?: number
   ): Promise<{ success: boolean; message?: string }> {
-    // Check users table
+    // Check only users table
+    const query = currentUserId
+      ? { email, id: Not(currentUserId), is_deleted: 0 }
+      : { email, is_deleted: 0 };
+
     const existingUser = await this.userRepository.findOne({
-      where: { email, is_deleted: 0 },
+      where: query,
     });
-    if (existingUser)
-      return { success: false, message: "EMAIL_ALREADY_EXISTS" };
 
-    // Check managers table
-    const managerQuery =
-      currentUserId && entityType === "manager"
-        ? { email, id: Not(currentUserId), is_deleted: 0 }
-        : { email, is_deleted: 0 };
-    const existingManager = await this.managerRepository.findOne({
-      where: managerQuery,
-    });
-    if (existingManager)
+    if (existingUser) {
       return { success: false, message: "EMAIL_ALREADY_EXISTS" };
-
-    // Check agents table
-    const agentQuery =
-      currentUserId && entityType === "agent"
-        ? { email, id: Not(currentUserId), is_deleted: 0 }
-        : { email, is_deleted: 0 };
-    const existingAgent = await this.agentRepository.findOne({
-      where: agentQuery,
-    });
-    if (existingAgent)
-      return { success: false, message: "EMAIL_ALREADY_EXISTS" };
+    }
 
     return { success: true };
   }
 
   private async checkPhoneAvailability(
     phone: string,
-    currentUserId?: number,
-    entityType?: "manager" | "agent"
+    currentUserId?: number
   ): Promise<{ success: boolean; message?: string }> {
-    // Check managers table
-    const managerQuery =
-      currentUserId && entityType === "manager"
-        ? { phone, id: Not(currentUserId), is_deleted: 0 }
-        : { phone, is_deleted: 0 };
-    const existingManager = await this.managerRepository.findOne({
-      where: managerQuery,
-    });
-    if (existingManager)
-      return { success: false, message: "PHONE_ALREADY_EXISTS" };
+    // Check only users table
+    const query = currentUserId
+      ? { phone, id: Not(currentUserId), is_deleted: 0 }
+      : { phone, is_deleted: 0 };
 
-    // Check agents table
-    const agentQuery =
-      currentUserId && entityType === "agent"
-        ? { phone, id: Not(currentUserId), is_deleted: 0 }
-        : { phone, is_deleted: 0 };
-    const existingAgent = await this.agentRepository.findOne({
-      where: agentQuery,
+    const existingUser = await this.userRepository.findOne({
+      where: query,
     });
-    if (existingAgent)
+
+    if (existingUser) {
       return { success: false, message: "PHONE_ALREADY_EXISTS" };
+    }
 
     return { success: true };
   }
@@ -205,7 +191,7 @@ export class UserService {
 
       // Same payload for both tokens
       const payload = {
-        sub: user.id,
+        userId: user.id,
         email: user.email,
         role: user.role,
         role_id: user.role_id,
@@ -291,209 +277,86 @@ export class UserService {
     }
   }
 
-  // Common Add or Edit Manager
-  async addOrEditManager(dto: ManagerDto) {
+  // Unified Add or Edit User
+  async addOrEditUser(dto: AddOrEditUserDto) {
     try {
-      // Find existing manager if editing
-      let currentManager: Manager | null = null;
-      if (dto.id) {
-        currentManager = await this.managerRepository.findOne({
-          where: { id: dto.id },
+      // Validate role_id if provided
+      let roleDetails: RoleDetails | null = null;
+      if (dto.role_id) {
+        roleDetails = await this.roleDetailsRepository.findOne({
+          where: { id: dto.role_id, is_deleted: 0 },
         });
-        if (!currentManager)
-          return { success: false, message: "USER_NOT_FOUND" };
-      }
-
-      // Check email across users, agents, and managers tables
-      if (!currentManager || dto.email !== currentManager.email) {
-        const emailCheck = await this.checkEmailAvailability(
-          dto.email,
-          dto.id,
-          "manager"
-        );
-        if (!emailCheck.success) return emailCheck;
-      }
-
-      // Check phone number if provided
-      if (dto.phone) {
-        if (!currentManager || dto.phone !== currentManager.phone) {
-          const phoneCheck = await this.checkPhoneAvailability(
-            dto.phone,
-            dto.id,
-            "manager"
-          );
-          if (!phoneCheck.success) return phoneCheck;
+        if (!roleDetails) {
+          return { success: false, message: "ROLE_NOT_FOUND" };
         }
       }
 
-      let savedManager: Manager;
+      // Check email availability
+      const emailCheck = await this.checkEmailAvailability(dto.email, dto.id);
+      if (!emailCheck.success) return emailCheck;
+
+      // Check phone availability if provided
+      if (dto.phone) {
+        const phoneCheck = await this.checkPhoneAvailability(dto.phone, dto.id);
+        if (!phoneCheck.success) return phoneCheck;
+      }
+
+      let user: User;
       if (dto.id) {
         // Edit mode
-        const manager = await this.managerRepository.findOne({
-          where: { id: dto.id },
+        user = await this.userRepository.findOne({
+          where: { id: dto.id, is_deleted: 0 },
         });
-        const oldEmail = manager.email;
-        Object.assign(manager, dto);
-        savedManager = await this.managerRepository.save(manager);
-
-        // Update base user email if changed
-        if (dto.email !== oldEmail) {
-          const user = await this.userRepository.findOne({
-            where: { email: oldEmail, role: UserRole.MANAGER, role_id: dto.id },
-          });
-          if (user) {
-            user.email = dto.email;
-            await this.userRepository.save(user);
-          }
-        }
-
-        // Update password if provided
-        if (dto.password) {
-          const user = await this.userRepository.findOne({
-            where: { role: UserRole.MANAGER, role_id: dto.id },
-          });
-          if (user) {
-            const saltRounds = parseInt(
-              this.configService.get("SALT_ROUND") || "10",
-              10
-            );
-            const salt = await bcrypt.genSalt(saltRounds);
-            user.password = await bcrypt.hash(dto.password, salt);
-            user.password_changed_at = new Date();
-            await this.userRepository.save(user);
-          }
-        }
+        if (!user) return { success: false, message: "USER_NOT_FOUND" };
       } else {
         // Add mode
-        const manager = this.managerRepository.create(dto);
-        savedManager = await this.managerRepository.save(manager);
+        user = new User();
+      }
 
-        const user = new User();
-        user.email = dto.email;
+      user.first_name = dto.first_name;
+      user.last_name = dto.last_name;
+      user.email = dto.email;
+      user.phone = dto.phone || null;
+      user.fk_manager_id = dto.fk_manager_id || null;
+
+      if (roleDetails) {
+        user.role_id = roleDetails.id;
+        // Map RoleType to UserRole. They have same string values.
+        user.role = roleDetails.role_type as unknown as UserRole;
+      } else {
+        user.role = dto.role;
+        user.role_id = dto.role_id || null;
+      }
+
+      // Use password from DTO if provided
+      if (dto.password) {
         const saltRounds = parseInt(
           this.configService.get("SALT_ROUND") || "10",
           10
         );
         const salt = await bcrypt.genSalt(saltRounds);
-        // Use provided password or generate a secure one
-        const passwordToUse = dto.password || this.commonService.generateSecurePassword();
-        user.password = await bcrypt.hash(passwordToUse, salt);
-        user.role = UserRole.MANAGER;
-        user.role_id = savedManager.id;
-        await this.userRepository.save(user);
-      }
-
-      return {
-        success: true,
-        message: dto.id ? "USER_UPDATED_SUCCESS" : "USER_CREATED_SUCCESS",
-        data: savedManager,
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Common Add or Edit Agent
-  async addOrEditAgent(dto: AgentDto) {
-    try {
-      // Check if manager exists
-      const manager = await this.managerRepository.findOne({
-        where: { id: dto.fk_manager_id, is_deleted: 0 },
-      });
-      if (!manager) return { success: false, message: "MANAGER_NOT_FOUND" };
-
-      // Find existing agent if editing
-      let currentAgent: Agent | null = null;
-      if (dto.id) {
-        currentAgent = await this.agentRepository.findOne({
-          where: { id: dto.id },
-        });
-        if (!currentAgent) return { success: false, message: "USER_NOT_FOUND" };
-      }
-
-      // Check email across users, managers, and agents tables
-      if (!currentAgent || dto.email !== currentAgent.email) {
-        const emailCheck = await this.checkEmailAvailability(
-          dto.email,
-          dto.id,
-          "agent"
-        );
-        if (!emailCheck.success) return emailCheck;
-      }
-
-      // Check phone number if provided
-      if (dto.phone) {
-        if (!currentAgent || dto.phone !== currentAgent.phone) {
-          const phoneCheck = await this.checkPhoneAvailability(
-            dto.phone,
-            dto.id,
-            "agent"
-          );
-          if (!phoneCheck.success) return phoneCheck;
-        }
-      }
-
-      let savedAgent: Agent;
-      if (dto.id) {
-        // Edit mode
-        const agent = await this.agentRepository.findOne({
-          where: { id: dto.id },
-        });
-        const oldEmail = agent.email;
-        Object.assign(agent, dto);
-        savedAgent = await this.agentRepository.save(agent);
-
-        if (dto.email !== oldEmail) {
-          const user = await this.userRepository.findOne({
-            where: { email: oldEmail, role: UserRole.AGENT, role_id: dto.id },
-          });
-          if (user) {
-            user.email = dto.email;
-            await this.userRepository.save(user);
-          }
-        }
-
-        // Update password if provided
-        if (dto.password) {
-          const user = await this.userRepository.findOne({
-            where: { role: UserRole.AGENT, role_id: dto.id },
-          });
-          if (user) {
-            const saltRounds = parseInt(
-              this.configService.get("SALT_ROUND") || "10",
-              10
-            );
-            const salt = await bcrypt.genSalt(saltRounds);
-            user.password = await bcrypt.hash(dto.password, salt);
-            user.password_changed_at = new Date();
-            await this.userRepository.save(user);
-          }
-        }
-      } else {
-        // Add mode
-        const agent = this.agentRepository.create(dto);
-        savedAgent = await this.agentRepository.save(agent);
-
-        const user = new User();
-        user.email = dto.email;
+        user.password = await bcrypt.hash(dto.password, salt);
+        user.password_changed_at = new Date();
+      } else if (!dto.id) {
+        // Add mode, generate password if not provided in DTO
         const saltRounds = parseInt(
           this.configService.get("SALT_ROUND") || "10",
           10
         );
         const salt = await bcrypt.genSalt(saltRounds);
-        // Use provided password or generate a secure one
-        const passwordToUse =
-          dto.password || this.commonService.generateSecurePassword();
-        user.password = await bcrypt.hash(passwordToUse, salt);
-        user.role = UserRole.AGENT;
-        user.role_id = savedAgent.id;
-        await this.userRepository.save(user);
+        user.password = await bcrypt.hash(dto.password, salt);
       }
+
+      if (dto.id) {
+        user.modify_at = new Date();
+      }
+
+      await this.userRepository.save(user);
 
       return {
         success: true,
         message: dto.id ? "USER_UPDATED_SUCCESS" : "USER_CREATED_SUCCESS",
-        data: savedAgent,
+        data: user,
       };
     } catch (error) {
       throw error;
@@ -501,7 +364,7 @@ export class UserService {
   }
 
   // Agent Leave Management
-  async addLeave(userId: number, dto: AgentLeaveDto) {
+  async addLeave(userId: number, agentId: any, dto: AgentLeaveDto) {
     try {
       const user = await this.userRepository.findOne({
         where: { id: userId, is_deleted: 0 },
@@ -533,7 +396,7 @@ export class UserService {
       const existing = await this.agentLeaveCalendarRepository
         .createQueryBuilder("lc")
         .select("lc.id", "id")
-        .where("lc.fk_agent_id = :agentId", { agentId: user.id })
+        .where("lc.fk_agent_id = :agentId", { agentId: userId })
         .andWhere(
           "(lc.leave_start_date = :startDate OR lc.leave_end_date = :endDate)",
           { startDate: startDateStr, endDate: endDateStr }
@@ -550,7 +413,7 @@ export class UserService {
       const leaveCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
       const leave = this.agentLeaveCalendarRepository.create({
-        fk_agent_id: user.id,
+        fk_agent_id: userId,
         leave_start_date: startDate,
         leave_end_date: endDate,
         leave_count: leaveCount,
@@ -571,6 +434,277 @@ export class UserService {
     }
   }
 
+  async getUserList(filters: UserListFiltersDto) {
+    try {
+      const {
+        pageNumber = 1,
+        pageLimit = 10,
+        search,
+        role,
+        status,
+        is_csv,
+      } = filters;
+      const page = Number(pageNumber);
+      const limit = Number(pageLimit);
+      const skip = (page - 1) * limit;
+
+      const managerCount = await this.userRepository.count({
+        where: { role: UserRole.MANAGER, is_deleted: 0 },
+      });
+      const agentCount = await this.userRepository.count({
+        where: { role: UserRole.AGENT, is_deleted: 0 },
+      });
+      const blockCount = await this.userRepository.count({
+        where: { is_blocked: true, is_deleted: 0, role: Not(UserRole.ADMIN) },
+      });
+
+      let query = this.userRepository
+        .createQueryBuilder("users")
+        .select([
+          "users.id as id",
+          "CONCAT_WS(' ', users.first_name, users.last_name) as name",
+          "users.email as email",
+          "users.phone as phone",
+          "users.role as role",
+          "IF(users.is_blocked = 1, 'Blocked', 'Active') as status",
+          "COALESCE(CONCAT_WS(' ', (select mu.first_name, mu.last_name from users mu where mu.id=users.id)), '-') as manager",
+          "users.created_at as created_at",
+          "users.updated_at as updated_at",
+        ])
+        .where("user.is_deleted = 0")
+        .andWhere("user.role IN (:...roles)", {
+          roles: [UserRole.MANAGER, UserRole.AGENT],
+        });
+
+      if (search) {
+        query = query.andWhere(
+          "(users.first_name LIKE :search OR users.last_name LIKE :search OR users.email LIKE :search OR users.phone LIKE :search)",
+          { search: `%${search}%` }
+        );
+      }
+
+      if (role) {
+        query = query.andWhere("users.role = :role", { role });
+      }
+
+      if (status) {
+        if (status === "Active") {
+          query = query.andWhere("users.is_blocked = false");
+        } else if (status === "Blocked") {
+          query = query.andWhere("users.is_blocked = true");
+        }
+      }
+
+      query = query.orderBy("users.created_at", "DESC");
+
+      if (is_csv == 1) {
+        const rawData = await query.getRawMany();
+        return {
+          success: true,
+          data: { csvdata: rawData },
+        };
+      } else {
+        const [rawData, count] = await Promise.all([
+          query.limit(limit).offset(skip).getRawMany(),
+          query.getCount(),
+        ]);
+
+        const totalPages = Math.ceil(count / limit);
+
+        return {
+          success: true,
+          data: rawData,
+          total_count: count,
+          current_page: page,
+          total_pages: totalPages,
+          per_page: limit,
+          managerCount,
+          agentCount,
+          blockCount,
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async blockUnblockUser(dto: UserByIdDto) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: dto.id, is_deleted: 0 },
+      });
+      if (!user) {
+        return { success: false, message: "USER_NOT_FOUND" };
+      }
+
+      user.is_blocked = !user.is_blocked; // Auto-toggle!
+      user.modify_at = new Date();
+      await this.userRepository.save(user);
+
+      return {
+        success: true,
+        message: user.is_blocked
+          ? "USER_BLOCKED_SUCCESS"
+          : "USER_UNBLOCKED_SUCCESS",
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async deleteUser(dto: UserByIdDto, deletedByUserId: number) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: dto.id, is_deleted: 0 },
+      });
+      if (!user) {
+        return { success: false, message: "USER_NOT_FOUND" };
+      }
+
+      user.is_deleted = 1;
+      user.deleted_at = new Date();
+      user.deleted_by = deletedByUserId;
+      user.modify_at = new Date();
+      await this.userRepository.save(user);
+
+      return {
+        success: true,
+        message: "USER_DELETED_SUCCESS",
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getUserDetailsById(id: number) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id, is_deleted: 0 },
+      });
+      if (!user) {
+        return { success: false, message: "USER_NOT_FOUND" };
+      }
+
+      return {
+        success: true,
+        data: {
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          role_id: user.role_id,
+          is_blocked: user.is_blocked,
+          is_active: user.is_active,
+          fk_manager_id: user.fk_manager_id,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        },
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getUserRolePermissions(userId: number) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId, is_deleted: 0 },
+      });
+      if (!user) {
+        return { success: false, message: "USER_NOT_FOUND" };
+      }
+
+      const roleId = user.role_id;
+
+      const [modules, modulePermissions, rolePermissions] = await Promise.all([
+        this.moduleRepository.find({
+          where: { is_deleted: 0 },
+          order: { id: "ASC" },
+        }),
+        this.modulePermissionRepository.find({
+          where: { is_deleted: 0 },
+          order: { id: "ASC" },
+        }),
+        roleId
+          ? this.rolePermissionRepository.find({
+              where: { role_details_id: roleId, is_deleted: 0 },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const assignedPermissionIds = new Set(
+        rolePermissions.map((rp) => rp.module_permission_id)
+      );
+
+      const result = modules.map((module) => {
+        const permissions = modulePermissions
+          .filter((mp) => mp.module_id === module.id)
+          .map((mp) => ({
+            id: mp.id,
+            name: mp.name,
+            is_active: assignedPermissionIds.has(mp.id) ? 1 : 0,
+          }));
+
+        const isModuleActive = permissions.some((p) => p.is_active === 1)
+          ? 1
+          : 0;
+
+        return {
+          module_name: module.name,
+          is_active: isModuleActive,
+          role_permission: permissions,
+        };
+      });
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getPermissionList() {
+    try {
+      // Get Module/ModulePermission data
+      const modules = await this.moduleRepository.find({
+        where: { is_deleted: 0 },
+        order: { id: "ASC" },
+      });
+
+      const modulePermissions = await this.modulePermissionRepository.find({
+        where: { is_deleted: 0 },
+        order: { id: "ASC" },
+      });
+
+      // Construct module permission tree structure
+      const moduleList = modules.map((module) => {
+        const permissions = modulePermissions
+          .filter((mp) => mp.module_id === module.id)
+          .map((mp) => ({
+            id: mp.id,
+            name: mp.name,
+          }));
+
+        return {
+          id: module.id,
+          name: module.name,
+          module_permissions: permissions,
+        };
+      });
+
+      return {
+        success: true,
+        data: moduleList,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async getLeaveList(userId: number, role: string, filters: any) {
     try {
       const { pageNumber = 1, pageLimit = 10, search, is_csv } = filters;
@@ -579,47 +713,40 @@ export class UserService {
       const skip = (page - 1) * limit;
 
       let query = this.agentLeaveCalendarRepository
-        .createQueryBuilder("leave")
-        .leftJoin("leave.agent", "agent_user")
-        .leftJoin("Agent", "agent", "agent.id = agent_user.role_id")
+        .createQueryBuilder("agent_leave_calendar")
+        .leftJoin(User, "users", "users.id = agent_leave_calendar.fk_agent_id")
         .select([
-          "leave.id as leave_id",
-          "leave.leave_start_date as leave_start_date",
-          "leave.leave_end_date as leave_end_date",
-          "leave.leave_count as leave_count",
-          "leave.leave_type as leave_type",
-          "leave.reason as reason",
-          "leave.is_cancel as is_cancel",
-          "leave.created_at as created_at",
-          "agent_user.email as agent_email",
-          "agent.first_name as agent_first_name",
-          "agent.last_name as agent_last_name",
+          "agent_leave_calendar.id as leave_id",
+          "agent_leave_calendar.leave_start_date as leave_start_date",
+          "agent_leave_calendar.leave_end_date as leave_end_date",
+          "agent_leave_calendar.leave_count as leave_count",
+          "agent_leave_calendar.leave_type as leave_type",
+          "agent_leave_calendar.reason as reason",
+          "agent_leave_calendar.is_cancel as is_cancel",
+          "agent_leave_calendar.created_at as created_at",
+          "users.email as agent_email",
+          "users.first_name as agent_first_name",
+          "users.last_name as agent_last_name",
         ]);
 
       if (role === UserRole.AGENT) {
-        query = query.where("leave.fk_agent_id = :userId", { userId });
-      } else if (role === UserRole.MANAGER) {
-        // Find manager's ID
-        const user = await this.userRepository.findOne({
-          where: { id: userId },
+        query = query.where("agent_leave_calendar.fk_agent_id = :userId", {
+          userId,
         });
-        if (user && user.role_id) {
-          query = query.where("agent.fk_manager_id = :managerId", {
-            managerId: user.role_id,
-          });
-        } else {
-          return { success: false, message: "MANAGER_NOT_FOUND" };
-        }
+      } else if (role === UserRole.MANAGER) {
+        query = query.where("users.fk_manager_id = :managerId", {
+          managerId: userId,
+        });
       }
 
       if (search) {
         query = query.andWhere(
-          "(agent.first_name LIKE :search OR agent.last_name LIKE :search OR agent_user.email LIKE :search)",
+          "(users.first_name LIKE :search OR users.last_name LIKE :search OR users.email LIKE :search)",
           { search: `%${search}%` }
         );
       }
 
-      query = query.orderBy("leave.leave_start_date", "DESC");
+      query = query.orderBy("agent_leave_calendar.leave_start_date", "DESC");
 
       if (is_csv == 1) {
         const csvdata = await query.getRawMany();

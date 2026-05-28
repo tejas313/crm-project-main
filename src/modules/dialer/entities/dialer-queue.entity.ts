@@ -12,11 +12,11 @@ import { Lead } from "../../lead/entities/lead.entity";
 import { User } from "../../user/entities/user.entity";
 
 export enum DialerQueueStatus {
-  QUEUED = "Queued",
-  CALLING = "Calling",
-  COMPLETED = "Completed",
-  FAILED = "Failed",
-  SKIPPED = "Skipped",
+  QUEUED = "queued",
+  CALLING = "calling",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  SKIPPED = "skipped",
 }
 
 @Entity("dialer_queue")
@@ -27,7 +27,7 @@ export class DialerQueue {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "fk_lead_id", type: "integer" })
+  @Column({ name: "fk_lead_id", type: "integer", nullable: false })
   fk_lead_id: number;
 
   @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
@@ -44,11 +44,11 @@ export class DialerQueue {
   @Column({ type: "integer", default: 0 })
   priority: number;
 
-  @Column({ name: "scheduled_call_time", type: "timestamp" })
+  @Column({ name: "scheduled_call_time", type: "timestamp", nullable: false })
   scheduled_call_time: Date;
 
-  @Column({ name: "is_immediate_dial", default: 0, type: "smallint" })
-  is_immediate_dial: number;
+  @Column({ name: "is_immediate_dial", default: false, type: "boolean" })
+  is_immediate_dial: boolean;
 
   @Column({
     name: "queue_status",
@@ -73,6 +73,23 @@ export class DialerQueue {
   @CreateDateColumn({ name: "created_at" })
   created_at: Date;
 
+  @Column({ name: "created_by", type: "integer", nullable: true })
+  created_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "created_by" })
+  createdByUser: User;
+
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
+
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "modify_by" })
+  modifyByUser: User;
 }

@@ -12,19 +12,19 @@ import { Lead } from "../../lead/entities/lead.entity";
 import { User } from "../../user/entities/user.entity";
 
 export enum AppointmentType {
-  SALES = "Sales",
-  TELESALES = "Telesales",
+  SALES = "sales",
+  TELESALES = "telesales",
 }
 
 export enum SalesType {
-  RE = "Re",
-  TELESALES = "Telesales",
+  RE = "re",
+  TELESALES = "telesales",
 }
 
 export enum ConsultationType {
-  PERSONAL = "Personal",
-  TELEPHONE = "Telephone",
-  VIDEO = "Video",
+  PERSONAL = "personal",
+  TELEPHONE = "telephone",
+  VIDEO = "video",
 }
 
 @Entity("appointments")
@@ -60,6 +60,18 @@ export class Appointment {
   @Column({ name: "consultation_type", type: "enum", enum: ConsultationType })
   consultation_type: ConsultationType;
 
+  @Column({ name: "phone", type: "varchar" })
+  phone: string;
+
+  @Column({ name: "email", type: "varchar" })
+  email: string;
+
+  @Column({ name: "fk_lead_status_id", type: "integer", nullable: true })
+  fk_lead_status_id: number;
+
+  @Column({ name: "contact_stage", type: "varchar" })
+  contact_stage: string;
+
   // Assignment
   @Column({ name: "fk_owner_id", type: "integer" })
   fk_owner_id: number;
@@ -73,10 +85,6 @@ export class Appointment {
 
   @Column({ name: "fk_assign_sales_id", type: "integer", nullable: true })
   fk_assign_sales_id: number;
-
-  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
-  @JoinColumn({ name: "fk_assign_sales_id" })
-  assigned_sales: User;
 
   @Column({ name: "is_fallback_assignment", default: false })
   is_fallback_assignment: boolean;
@@ -136,7 +144,7 @@ export class Appointment {
   is_locked: number;
 
   @Column({ name: "is_synced_with_stemcell", type: "smallint", default: 0 })
-  is_synced_with_stemcell: boolean;
+  is_synced_with_stemcell: number;
 
   @Column({ type: "text", nullable: true })
   notes: string;
@@ -146,4 +154,14 @@ export class Appointment {
 
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
+
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "modify_by" })
+  modifyByUser: User;
 }

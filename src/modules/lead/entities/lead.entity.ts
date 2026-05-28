@@ -5,59 +5,40 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToOne,
   JoinColumn,
   Index,
 } from "typeorm";
-import { User } from "../../user/entities/user.entity";
-
-export enum LeadStatus {
-  NEW_LEAD = "New lead",
-  CONTACTED = "Contacted",
-  QUALIFIED = "Qualified",
-  APPOINTMENT_SET = "Appointment set",
-  PRESENTATION_DONE = "Presentation done",
-  FOLLOW_UP = "Follow up",
-  READY_TO_ENROLL = "Ready to enroll",
-  ENROLLED = "Enrolled",
-  DROPPED = "Dropped",
-  NOT_REACHABLE = "Not reachable",
-}
-
-export enum LeadSource {
-  FACEBOOK = "Facebook",
-  WEBSITE = "Website",
-  INSTAGRAM = "Instagram",
-  PHONE_CALL = "Phone call",
-  WEBSITE_FORM = "Website form",
-  REFERRAL = "Referral",
-  OTHER = "Other",
-}
+import { User, UserRole } from "../../user/entities/user.entity";
+import { LeadStatusEntity } from "./lead-status.entity";
+import { LeadSourceMaster } from "./lead-source-master.entity";
+import { LeadMediumMaster } from "./lead-medium-master.entity";
+import { LeadAddress } from "./lead-address.entity";
 
 export enum LeadStage {
-  NEW = "New",
-  CONTACTED = "Contacted",
-  QUALIFIED = "Qualified",
-  APPOINTMENT_SCHEDULED = "Appointment scheduled",
-  PRESENTATION_COMPLETED = "Presentation completed",
-  FOLLOW_UP = "Follow up",
-  READY_TO_ENROLL = "Ready to enroll",
-  ENROLLED = "Enrolled",
-  DROPPED = "Dropped",
-  NOT_REACHABLE = "Not reachable",
+  NEW = "new",
+  CONTACTED = "contacted",
+  QUALIFIED = "qualified",
+  APPOINTMENT_SCHEDULED = "appointment_scheduled",
+  PRESENTATION_COMPLETED = "presentation_completed",
+  FOLLOW_UP = "follow_up",
+  READY_TO_ENROLL = "ready_to_enroll",
+  ENROLLED = "enrolled",
+  DROPPED = "dropped",
+  NOT_REACHABLE = "not_reachable",
 }
 
 @Entity("leads")
-@Index(["lead_source"])
-@Index(["lead_status"])
+@Index(["lead_id"])
+@Index(["lead_source_id"])
+@Index(["lead_status_id"])
 @Index(["created_at"])
-@Index(["state_id"])
-@Index(["city_id"])
 export class Lead {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "lead_id", type: "integer", unique: true })
-  lead_id: string;
+  @Column({ name: "lead_id", type: "integer", unique: true, nullable: false })
+  lead_id: number;
 
   @Column({ name: "first_name", type: "varchar", length: 100 })
   first_name: string;
@@ -71,8 +52,8 @@ export class Lead {
   @Column({
     name: "phone_country_code",
     length: 5,
-    default: "+91",
     type: "varchar",
+    default: "+91",
   })
   phone_country_code: string;
 
@@ -86,7 +67,7 @@ export class Lead {
 
   @Column({
     name: "alternate_email",
-    length: 20,
+    length: 200,
     type: "varchar",
     nullable: true,
   })
@@ -94,19 +75,6 @@ export class Lead {
 
   @Column({ length: 255, nullable: true, unique: true, type: "varchar" })
   email: string;
-
-  // Source Information
-  @Column({ name: "lead_source", type: "enum", enum: LeadSource })
-  lead_source: LeadSource;
-
-  @Column({ length: 100, nullable: true, type: "varchar" })
-  medium: string;
-
-  @Column({ name: "source_id", length: 100, nullable: true, type: "varchar" })
-  source_id: string;
-
-  @Column({ name: "medium_id", length: 100, nullable: true, type: "varchar" })
-  medium_id: string;
 
   @Column({
     name: "campaign_name",
@@ -151,42 +119,34 @@ export class Lead {
   interested_product: string;
 
   @Column({
-    name: "current_hospital",
+    name: "referrer_crm_number",
     type: "varchar",
-    length: 255,
+    length: 100,
     nullable: true,
   })
-  current_hospital: string;
+  referrer_crm_number: string;
 
-  @Column({
-    name: "current_doctor",
-    type: "varchar",
-    length: 255,
-    nullable: true,
-  })
-  current_doctor: string;
+  // System Information - Foreign Key Relations to Master Tables
+  @Column({ name: "lead_status_id", type: "integer", nullable: true })
+  lead_status_id: number;
 
-  // Location Information
-  @Column({ name: "state_id", type: "integer", nullable: true })
-  state_id: number;
+  @ManyToOne(() => LeadStatusEntity, { onDelete: "SET NULL" })
+  @JoinColumn({ name: "lead_status_id" })
+  leadStatus: LeadStatusEntity;
 
-  @Column({ name: "city_id", type: "integer", nullable: true })
-  city_id: number;
+  @Column({ name: "lead_source_id", type: "integer", nullable: true })
+  lead_source_id: number;
 
-  @Column({ length: 10, type: "varchar", nullable: true })
-  pincode: string;
+  @ManyToOne(() => LeadSourceMaster, { onDelete: "SET NULL" })
+  @JoinColumn({ name: "lead_source_id" })
+  leadSourceMaster: LeadSourceMaster;
 
-  @Column({ type: "text", nullable: true })
-  address: string;
+  @Column({ name: "lead_medium_id", type: "integer", nullable: true })
+  lead_medium_id: number;
 
-  // System Information
-  @Column({
-    name: "lead_status",
-    type: "enum",
-    enum: LeadStatus,
-    default: LeadStatus.NEW_LEAD,
-  })
-  lead_status: LeadStatus;
+  @ManyToOne(() => LeadMediumMaster, { onDelete: "SET NULL" })
+  @JoinColumn({ name: "lead_medium_id" })
+  leadMediumMaster: LeadMediumMaster;
 
   @Column({
     name: "lead_stage",
@@ -223,18 +183,11 @@ export class Lead {
   @Column({ name: "first_contacted_at", type: "timestamp", nullable: true })
   first_contacted_at: Date;
 
-  @Column({ name: "appointment_set_at", type: "timestamp", nullable: true })
-  appointment_set_at: Date;
-
   @Column({ name: "is_duplicate", default: 0, type: "smallint" })
   is_duplicate: number;
 
   @Column({ name: "fk_duplicate_of_lead_id", nullable: true, type: "integer" })
   fk_duplicate_of_lead_id: number;
-
-  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
-  @JoinColumn({ name: "fk_duplicate_of_lead_id" })
-  duplicate_of_lead: Lead;
 
   @Column({ name: "duplicate_checked_at", type: "timestamp", nullable: true })
   duplicate_checked_at: Date;
@@ -267,6 +220,12 @@ export class Lead {
   @Column({ name: "nr7_triggered_at", type: "timestamp", nullable: true })
   nr7_triggered_at: Date;
 
+  @Column({ name: "note", type: "text", nullable: true })
+  note: string;
+
+  @Column({ name: "is_manually", type: "integer", default: 0 })
+  is_manually: number;
+
   // Quality & Scoring
   @Column({ name: "lead_score", type: "integer", default: 0 })
   lead_score: number;
@@ -274,7 +233,6 @@ export class Lead {
   // Soft Delete
   @Column({ name: "is_deleted", type: "smallint", width: 6, default: 0 })
   is_deleted: number;
-  // Reference: project_dbml
 
   @Column({ name: "deleted_at", type: "timestamp", nullable: true })
   deleted_at: Date;
@@ -295,19 +253,25 @@ export class Lead {
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
 
-  @Column({ name: "fk_created_by", nullable: true })
-  fk_created_by: number;
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "fk_created_by" })
-  created_by: User;
+  @JoinColumn({ name: "modify_by" })
+  modifyBy: User;
 
-  @Column({ name: "fk_updated_by", nullable: true })
-  fk_updated_by: number;
+  @Column({ name: "created_by", type: "integer", nullable: true })
+  created_by: number;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: "fk_updated_by" })
-  updated_by: User;
+  @JoinColumn({ name: "created_by" })
+  createdBy: User;
+
+  @OneToOne(() => LeadAddress, (address) => address.lead)
+  leadAddress: LeadAddress;
 
   // Computed property
   get fullName(): string {
