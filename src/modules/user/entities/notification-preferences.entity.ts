@@ -4,50 +4,64 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToOne,
+  ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
+import { Lead } from "../../lead/entities/lead.entity";
 import { User } from "./user.entity";
 
 @Entity("notification_preferences")
+@Index(["email_enable"])
+@Index(["whatsapp_enable"])
+@Index(["sms_enable"])
+@Index(["dnd_enabled"])
 export class NotificationPreferences {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "fk_user_id", unique: true, type: "integer" })
-  fk_user_id: number;
+  @Column({ name: "fk_lead_id", unique: true, type: "integer", nullable: false })
+  fk_lead_id: number;
 
-  @OneToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
-  @JoinColumn({ name: "fk_user_id" })
-  user: User;
+  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
+  @JoinColumn({ name: "fk_lead_id" })
+  lead: Lead;
 
-  @Column({ name: "email_enabled", default: true, type: "boolean" })
-  email_enabled: boolean;
+  @Column({ name: "email_enable", default: 0, type: "smallint" })
+  email_enable: number;
 
-  @Column({ name: "sms_enabled", default: false, type: "boolean" })
-  sms_enabled: boolean;
+  @Column({ name: "whatsapp_enable", default: 0, type: "smallint" })
+  whatsapp_enable: number;
 
-  @Column({ name: "whatsapp_enabled", default: false, type: "boolean" })
-  whatsapp_enabled: boolean;
+  @Column({ name: "sms_enable", default: 0, type: "smallint" })
+  sms_enable: number;
 
-  @Column({ name: "push_enabled", default: true, type: "boolean" })
-  push_enabled: boolean;
+  @Column({ name: "dnd_enabled", default: 0, type: "smallint" })
+  dnd_enabled: number;
 
-  @Column({ name: "task_reminders", default: true, type: "boolean" })
-  task_reminders: boolean;
-
-  @Column({ name: "appointment_reminders", default: true, type: "boolean" })
-  appointment_reminders: boolean;
-
-  @Column({ name: "lead_assignments", default: true, type: "boolean" })
-  lead_assignments: boolean;
-
-  @Column({ name: "daily_summary", default: false, type: "boolean" })
-  daily_summary: boolean;
+  @Column({ name: "reason", type: "text", nullable: true })
+  reason: string;
 
   @CreateDateColumn({ name: "created_at" })
   created_at: Date;
 
+  @Column({ name: "created_by", type: "integer", nullable: true })
+  created_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "created_by" })
+  createdByUser: User;
+
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
+
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "modify_by" })
+  modifyByUser: User;
 }

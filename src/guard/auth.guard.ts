@@ -11,7 +11,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { TokenExpiredError } from "jsonwebtoken";
 import { UserSession } from "src/modules/user/entities/user-session.entity";
-import { UserRole } from "src/modules/user/entities/user.entity";
+import { RoleType } from "src/modules/user/entities/role-details.entity";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -51,14 +51,14 @@ export class AuthGuard implements CanActivate {
       }
 
       // Check for valid roles: admin, manager, agent
-      const validRoles = [UserRole.ADMIN, UserRole.MANAGER, UserRole.AGENT];
+      const validRoles = [RoleType.ADMIN, RoleType.MANAGER, RoleType.AGENT];
       if (!validRoles.includes(payload.role)) {
         throw new ForbiddenException("INVALID_ROLE");
       }
 
       // Attach user info to request
       request.user = {
-        userId: payload.id,
+        userId: payload.userId,
         role: payload.role,
         role_id: payload.role_id,
       };

@@ -10,34 +10,33 @@ import {
 } from "typeorm";
 import { Lead } from "../../lead/entities/lead.entity";
 import { User } from "../../user/entities/user.entity";
-import { LeadStatus } from "../../lead/entities/lead.entity";
 
 export enum CallOrigin {
-  INBOUND = "Inbound",
-  OUTBOUND = "Outbound",
-  DIALER = "Dialer",
+  INBOUND = "inbound",
+  OUTBOUND = "outbound",
+  DIALER = "dialer",
 }
 
 @Entity("dialer_calls")
 @Index(["fk_lead_id"])
 @Index(["fk_agent_id"])
 @Index(["dialer_status"])
-@Index(["crm_lead_status"])
+@Index(["fk_crm_lead_status_id"])
 export class DialerCalls {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "fk_lead_id", type: "integer" })
+  @Column({ name: "fk_lead_id", type: "integer", nullable: false })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
+  @ManyToOne(() => Lead)
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
-  @Column({ name: "fk_agent_id", type: "integer" })
+  @Column({ name: "fk_agent_id", type: "integer", nullable: false })
   fk_agent_id: number;
 
-  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
+  @ManyToOne(() => User)
   @JoinColumn({ name: "fk_agent_id" })
   agent: User;
 
@@ -49,16 +48,16 @@ export class DialerCalls {
   })
   display_number: string;
 
-  @Column({ name: "call_date_time", type: "timestamp" })
+  @Column({ name: "call_date_time", type: "timestamp", nullable: false })
   call_date_time: Date;
 
   @Column({ name: "call_duration", type: "integer", nullable: true })
   call_duration: number;
 
-  @Column({ name: "call_origin", type: "enum", enum: CallOrigin })
+  @Column({ name: "call_origin", type: "enum", enum: CallOrigin, nullable: false })
   call_origin: CallOrigin;
 
-  @Column({ nullable: true })
+  @Column({ name: "owner", nullable: true, type: "integer" })
   owner: number;
 
   @Column({
@@ -78,12 +77,11 @@ export class DialerCalls {
   raw_call_status: string;
 
   @Column({
-    name: "crm_lead_status",
-    type: "enum",
-    enum: LeadStatus,
+    name: "fk_crm_lead_status_id",
+    type: "integer",
     nullable: true,
   })
-  crm_lead_status: LeadStatus;
+  fk_crm_lead_status_id: number;
 
   @Column({
     name: "disposition_status",
@@ -110,6 +108,23 @@ export class DialerCalls {
   @CreateDateColumn({ name: "created_at" })
   created_at: Date;
 
+  @Column({ name: "created_by", type: "integer", nullable: true })
+  created_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "created_by" })
+  createdByUser: User;
+
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
+
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "modify_by" })
+  modifyByUser: User;
 }

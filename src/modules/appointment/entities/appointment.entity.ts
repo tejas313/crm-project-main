@@ -12,74 +12,70 @@ import { Lead } from "../../lead/entities/lead.entity";
 import { User } from "../../user/entities/user.entity";
 
 export enum AppointmentType {
-  SALES = "Sales",
-  TELESALES = "Telesales",
-}
-
-export enum SalesType {
-  RE = "Re",
-  TELESALES = "Telesales",
+  SALES = "sales",
+  TELESALES = "telesales",
 }
 
 export enum ConsultationType {
-  PERSONAL = "Personal",
-  TELEPHONE = "Telephone",
-  VIDEO = "Video",
+  PERSONAL = "personal",
+  TELEPHONE = "telephone",
+  VIDEO = "video",
 }
 
 @Entity("appointments")
 @Index(["fk_lead_id"])
-@Index(["fk_owner_id"])
-@Index(["current_appointment_date"])
+@Index(["appointment_type"])
+@Index(["appointment_date"])
 @Index(["fk_hospital_id"])
 @Index(["fk_doctor_id"])
-@Index(["is_fallback_assignment"])
 export class Appointment {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({
-    name: "appointment_id",
+    name: "stemcell_appointment_id",
     type: "varchar",
     length: 50,
     unique: true,
     nullable: true,
   })
-  appointment_id: string;
+  stemcell_appointment_id: string;
 
-  @Column({ name: "fk_lead_id", type: "integer" })
+  @Column({ name: "fk_lead_id", type: "integer", nullable: false })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
+  @ManyToOne(() => Lead)
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
-  @Column({ name: "appointment_type", type: "enum", enum: AppointmentType })
+  @Column({ name: "appointment_type", type: "enum", enum: AppointmentType, nullable: false })
   appointment_type: AppointmentType;
 
-  @Column({ name: "consultation_type", type: "enum", enum: ConsultationType })
+  @Column({ name: "consultation_type", type: "enum", enum: ConsultationType, nullable: false })
   consultation_type: ConsultationType;
 
+  @Column({ name: "phone", type: "varchar", nullable: false })
+  phone: string;
+
+  @Column({ name: "email", type: "varchar", nullable: false })
+  email: string;
+
+  @Column({ name: "fk_lead_status_id", type: "integer", nullable: true })
+  fk_lead_status_id: number;
+
+  @Column({ name: "contact_stage", type: "varchar", nullable: false })
+  contact_stage: string;
+
   // Assignment
-  @Column({ name: "fk_owner_id", type: "integer" })
+  @Column({ name: "fk_owner_id", type: "integer", nullable: false })
   fk_owner_id: number;
 
-  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
+  @ManyToOne(() => User)
   @JoinColumn({ name: "fk_owner_id" })
   owner: User;
 
-  @Column({ name: "sales_type", type: "enum", enum: SalesType, nullable: true })
-  sales_type: SalesType;
-
-  @Column({ name: "fk_assign_sales_id", type: "integer", nullable: true })
+  @Column({ name: "fk_assign_sales_id", type: "integer", nullable: false })
   fk_assign_sales_id: number;
-
-  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
-  @JoinColumn({ name: "fk_assign_sales_id" })
-  assigned_sales: User;
-
-  @Column({ name: "is_fallback_assignment", default: false })
-  is_fallback_assignment: boolean;
 
   // Medical Information
   @Column({ name: "pregnancy_edd", type: "date", nullable: true })
@@ -107,18 +103,11 @@ export class Appointment {
 
   // Scheduling
   @Column({
-    name: "original_appointment_date",
+    name: "appointment_date",
     type: "timestamp",
     nullable: true,
   })
-  original_appointment_date: Date;
-
-  @Column({
-    name: "current_appointment_date",
-    type: "timestamp",
-    nullable: true,
-  })
-  current_appointment_date: Date;
+  appointment_date: Date;
 
   @Column({ name: "confirmed_slot", type: "timestamp", nullable: true })
   confirmed_slot: Date;
@@ -132,18 +121,35 @@ export class Appointment {
   })
   disposition_status: string;
 
-  @Column({ name: "is_locked", type: "smallint", default: 0 })
-  is_locked: number;
-
   @Column({ name: "is_synced_with_stemcell", type: "smallint", default: 0 })
-  is_synced_with_stemcell: boolean;
+  is_synced_with_stemcell: number;
 
-  @Column({ type: "text", nullable: true })
+  @Column({ name: "is_deleted", type: "smallint", default: 0 })
+  is_deleted: number;
+
+  @Column({ name: "notes", type: "text", nullable: true })
   notes: string;
 
   @CreateDateColumn({ name: "created_at" })
   created_at: Date;
 
+  @Column({ name: "created_by", type: "integer", nullable: true })
+  created_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "created_by" })
+  createdByUser: User;
+
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;
+
+  @Column({ name: "modify_at", type: "timestamp", nullable: true })
+  modify_at: Date;
+
+  @Column({ name: "modify_by", type: "integer", nullable: true })
+  modify_by: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "modify_by" })
+  modifyByUser: User;
 }

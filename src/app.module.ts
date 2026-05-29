@@ -14,7 +14,10 @@ import { APP_PIPE } from "@nestjs/core";
 import { ValidationPipe } from "./common/validation.pipe";
 import { LoggerMiddleware } from "./middlewares/logger.middleware";
 import { UserModule } from "./modules/user/user.module";
+import { LeadModule } from "./modules/lead/lead.module";
 import { ConfigModule } from "@nestjs/config";
+import { TaskModule } from "./modules/task/task.module";
+import { ActivityModule } from "./modules/activity/activity.module";
 
 @Module({
   controllers: [],
@@ -45,6 +48,9 @@ import { ConfigModule } from "@nestjs/config";
     // }),
     MulterModule.register(multerConfig),
     UserModule,
+    LeadModule,
+    TaskModule,
+    ActivityModule,
   ],
 })
 export class AppModule {

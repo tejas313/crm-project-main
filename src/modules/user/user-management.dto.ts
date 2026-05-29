@@ -5,7 +5,82 @@ import {
   IsString,
   IsOptional,
   IsNumber,
+  IsEnum,
+  Matches,
 } from "class-validator";
+import { RoleType } from "./entities/role-details.entity";
+
+export class AddOrEditUserDto {
+  @ApiProperty({
+    example: 1,
+    description: "ID of the user (leave empty for add, provide for edit)",
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  id?: number;
+
+  @ApiProperty({
+    example: "Manager",
+    description: "User role: Manager or Agent",
+    enum: [RoleType.MANAGER, RoleType.AGENT],
+  })
+  @IsEnum([RoleType.MANAGER, RoleType.AGENT], {
+    message: "Role must be either Manager or Agent",
+  })
+  @IsNotEmpty()
+  role: RoleType;
+
+  @ApiProperty({ example: "John" })
+  @IsString()
+  @IsNotEmpty()
+  first_name: string;
+
+  @ApiProperty({ example: "Doe" })
+  @IsString()
+  @IsNotEmpty()
+  last_name: string;
+
+  @ApiProperty({ example: "user@example.com" })
+  @IsEmail({}, { message: "Invalid email format" })
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({ example: "1234567890", required: false })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{10,15}$/, {
+    message: "Phone number must be between 10 to 15 digits",
+  })
+  phone?: string;
+
+  @ApiProperty({
+    example: "SecurePass123!",
+    required: false,
+    description: "Password (optional, auto-generated if not provided)",
+  })
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @ApiProperty({
+    example: 1,
+    description: "ID of the manager (required only for Agent role)",
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  fk_manager_id?: number;
+
+  @ApiProperty({
+    example: 1,
+    description: "ID of the role (from role_details table)",
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  role_id?: number;
+}
 
 export class ManagerDto {
   @ApiProperty({
@@ -133,15 +208,50 @@ export class LeaveListDto {
   is_csv?: number;
 }
 
-export class AddUserPermissionsDto {
-  // user id to which permissions will be assigned
+export class AddRolePermissionsDto {
   @ApiProperty({ example: 1 })
   @IsNotEmpty()
   @IsNumber()
-  fk_user_id: number;
+  role_details_id: number;
 
-  // array of child permission ids
   @ApiProperty({ example: [1, 2, 3] })
   @IsNotEmpty()
-  permissions: number[];
+  @IsNumber({}, { each: true })
+  module_permission_id: number[];
+}
+
+export class UserListFiltersDto {
+  @ApiProperty({ example: 1, required: false })
+  @IsOptional()
+  pageNumber?: number;
+
+  @ApiProperty({ example: 10, required: false })
+  @IsOptional()
+  pageLimit?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ required: false, enum: [RoleType.MANAGER, RoleType.AGENT] })
+  @IsOptional()
+  @IsEnum([RoleType.MANAGER, RoleType.AGENT])
+  role?: RoleType;
+
+  @ApiProperty({ required: false, enum: ["Active", "Blocked"] })
+  @IsOptional()
+  @IsString()
+  status?: "Active" | "Blocked";
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  is_csv?: number;
+}
+
+export class UserByIdDto {
+  @ApiProperty({ example: 1 })
+  @IsNotEmpty()
+  @IsNumber()
+  id: number;
 }
