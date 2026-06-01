@@ -44,7 +44,7 @@ export class Appointment {
   @Column({ name: "fk_lead_id", type: "integer", nullable: false })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead)
+  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
@@ -70,7 +70,7 @@ export class Appointment {
   @Column({ name: "fk_owner_id", type: "integer", nullable: false })
   fk_owner_id: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_owner_id" })
   owner: User;
 
@@ -136,7 +136,7 @@ export class Appointment {
   @Column({ name: "created_by", type: "integer", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdByUser: User;
 
@@ -149,7 +149,7 @@ export class Appointment {
   @Column({ name: "modify_by", type: "integer", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyByUser: User;
 }

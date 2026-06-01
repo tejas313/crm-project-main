@@ -19,7 +19,7 @@ export class ModulePermission {
   @Column({ name: "fk_module_id", type: "int", nullable: true })
   fk_module_id: number;
 
-  @ManyToOne(() => Module)
+  @ManyToOne(() => Module, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_module_id" })
   module: Module;
 

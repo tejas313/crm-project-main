@@ -1,19 +1,16 @@
-import {
-  Controller,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
-import { TaskService } from "./task.service";
+import { AppointmentService } from "./appointment.service";
 import { AuthGuard } from "../../guard/auth.guard";
 import { ResponseService } from "../../common/response.service";
 
-@ApiTags("Tasks")
-@Controller("tasks")
+@ApiTags("Appointments")
+@Controller("appointments")
 @UseGuards(AuthGuard)
 @ApiBearerAuth("authorization")
-export class TaskController {
+export class AppointmentController {
   constructor(
-    private readonly taskService: TaskService,
+    private readonly appointmentService: AppointmentService,
     private readonly responseService: ResponseService
   ) {}
 }

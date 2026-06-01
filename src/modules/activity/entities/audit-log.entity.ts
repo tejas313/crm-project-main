@@ -36,7 +36,7 @@ export class AuditLog {
   @Column({ name: "created_by", type: "integer", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdByUser: User;
 }

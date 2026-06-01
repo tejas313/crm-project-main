@@ -1,10 +1,5 @@
 import { applyDecorators } from "@nestjs/common";
-import {
-  ApiOperation,
-  ApiResponse,
-  ApiHeader,
-  ApiSecurity,
-} from "@nestjs/swagger";
+import { ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { AuthGuard } from "src/guard/auth.guard";
 import { UseGuards, UsePipes } from "@nestjs/common";
 import { ValidationPipe } from "./validation.pipe";
@@ -15,11 +10,7 @@ export function ApiOperationWithSwaggerSummary(summary: string) {
 }
 
 export function ApiAuthHeaders() {
-  return ApiHeader({
-    name: "authorization",
-    description: "Enter access-token",
-    required: false,
-  });
+  return ApiBearerAuth("authorization");
 }
 
 export function ApiCommonResponses() {
@@ -38,7 +29,6 @@ export function ApiCommonResponses() {
 export function ApiNonAuthCommonDecorators(text = "") {
   return applyDecorators(
     UsePipes(ValidationPipe),
-    ApiSecurity("authorization"),
     ApiCommonResponses(),
     ApiOperationWithSwaggerSummary(text)
   );
@@ -47,9 +37,9 @@ export function ApiAdminRefreshCommonDecorators(text = "") {
   return applyDecorators(
     UseGuards(RefreshGuard),
     UsePipes(ValidationPipe),
-    ApiSecurity("authorization"),
     ApiCommonResponses(),
-    ApiOperationWithSwaggerSummary(text)
+    ApiOperationWithSwaggerSummary(text),
+    ApiAuthHeaders()
   );
 }
 
@@ -57,7 +47,6 @@ export function ApiCommonDecorators(text = "") {
   return applyDecorators(
     UseGuards(AuthGuard),
     UsePipes(ValidationPipe),
-    ApiSecurity("authorization"),
     ApiCommonResponses(),
     ApiOperationWithSwaggerSummary(text),
     ApiAuthHeaders()
@@ -67,7 +56,6 @@ export function ApiAdminCommonDecorators(text = "") {
   return applyDecorators(
     UseGuards(AuthGuard),
     UsePipes(ValidationPipe),
-    ApiSecurity("authorization"),
     ApiCommonResponses(),
     ApiOperationWithSwaggerSummary(text),
     ApiAuthHeaders()

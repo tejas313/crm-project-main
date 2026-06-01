@@ -23,14 +23,14 @@ export class EmailNotification {
   @Column({ name: "fk_lead_id", nullable: true, type: "integer" })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead, { onDelete: "SET NULL" })
+  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
   @Column({ name: "fk_user_id", nullable: true, type: "integer" })
   fk_user_id: number;
 
-  @ManyToOne(() => User, { onDelete: "SET NULL" })
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_user_id" })
   user: User;
 

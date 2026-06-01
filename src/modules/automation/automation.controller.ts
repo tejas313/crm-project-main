@@ -1,19 +1,16 @@
-import {
-  Controller,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
-import { TaskService } from "./task.service";
+import { AutomationService } from "./automation.service";
 import { AuthGuard } from "../../guard/auth.guard";
 import { ResponseService } from "../../common/response.service";
 
-@ApiTags("Tasks")
-@Controller("tasks")
+@ApiTags("Automation")
+@Controller("automation")
 @UseGuards(AuthGuard)
 @ApiBearerAuth("authorization")
-export class TaskController {
+export class AutomationController {
   constructor(
-    private readonly taskService: TaskService,
+    private readonly automationService: AutomationService,
     private readonly responseService: ResponseService
   ) {}
 }

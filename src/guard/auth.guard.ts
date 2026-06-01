@@ -24,9 +24,13 @@ export class AuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     
-    // Task requirement: headers inside authorizations key required
-    const token = request.headers.authorizations;
-    
+    // Task requirement: headers inside authorization key required
+    const authHeader = request.headers.authorization;
+    console.log("request----",request.headers)
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
+      : null;
+
     if (!token) {
       throw new UnauthorizedException("AUTH_TOKEN_REQUIRED");
     }

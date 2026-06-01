@@ -1,9 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, Brackets } from "typeorm";
 import { Lead, LeadStage } from "./entities/lead.entity";
 import { CreateLeadDto } from "./dto/create-lead.dto";
-import { User } from "../user/entities/user.entity";
 import { RoleType } from "../user/entities/role-details.entity";
 
 @Injectable()
@@ -21,44 +24,53 @@ export class LeadService {
     phone: string,
     email?: string,
     alternatePhone?: string,
-    alternateEmail?: string
+    alternateEmail?: string,
+    excludeLeadId?: number
   ): Promise<{ isDuplicate: boolean; duplicateLeadId?: number }> {
     // Build query to check for duplicates
     const queryBuilder = this.leadRepository
       .createQueryBuilder("leads")
       .where("leads.is_deleted = :isDeleted", { isDeleted: 0 });
 
-    // Check primary phone
+    if (excludeLeadId) {
+      queryBuilder.andWhere("leads.id != :excludeLeadId", { excludeLeadId });
+    }
+
+    // Use Brackets to group all OR conditions for duplicate check
+    // This ensures that (is_deleted = 0 AND id != excludeLeadId) applies to all duplicate checks
     queryBuilder.andWhere(
-      "(leads.phone = :phone OR leads.alternate_phone = :phone)",
-      { phone }
+      new Brackets((qb) => {
+        qb.where("(leads.phone = :phone OR leads.alternate_phone = :phone)", {
+          phone,
+        });
+
+        // Check alternate phone if provided
+        if (alternatePhone) {
+          qb.orWhere(
+            "(leads.phone = :alternatePhone OR leads.alternate_phone = :alternatePhone)",
+            { alternatePhone }
+          );
+        }
+
+        // Check email if provided
+        if (email) {
+          qb.orWhere(
+            "(leads.email = :email OR leads.alternate_email = :email)",
+            { email }
+          );
+        }
+
+        // Check alternate email if provided
+        if (alternateEmail) {
+          qb.orWhere(
+            "(leads.email = :alternateEmail OR leads.alternate_email = :alternateEmail)",
+            { alternateEmail }
+          );
+        }
+      })
     );
 
-    // Check alternate phone if provided
-    if (alternatePhone) {
-      queryBuilder.orWhere(
-        "(leads.phone = :alternatePhone OR leads.alternate_phone = :alternatePhone)",
-        { alternatePhone }
-      );
-    }
-
-    // Check email if provided
-    if (email) {
-      queryBuilder.orWhere(
-        "(leads.email = :email OR leads.alternate_email = :email)",
-        { email }
-      );
-    }
-
-    // Check alternate email if provided
-    if (alternateEmail) {
-      queryBuilder.orWhere(
-        "(leads.email = :alternateEmail OR leads.alternate_email = :alternateEmail)",
-        { alternateEmail }
-      );
-    }
-
-    const duplicateLead = await queryBuilder.getRawOne();
+    const duplicateLead = await queryBuilder.getOne();
 
     if (duplicateLead) {
       return {
@@ -82,69 +94,87 @@ export class LeadService {
   }
 
   /**
-   * Create manual lead by agent
+   * Create or update manual lead
    */
-  async createManualLead(dto: CreateLeadDto, userId: number): Promise<any> {
+  async addOrEditLead(dto: CreateLeadDto, userId: number): Promise<any> {
     try {
-      // Validate pregnancy EDD if provided (no backdating)
-      if (dto.pregnancy_edd) {
-        if (!this.validatePregnancyEDD(dto.pregnancy_edd)) {
-          return {
-            success: false,
-            message: "PREGNANCY_EDD_CANNOT_BE_BACKDATED",
-          };
+      let lead: Lead;
+      if (dto.id) {
+        lead = await this.leadRepository.findOne({
+          where: { id: dto.id, is_deleted: 0 },
+        });
+        if (!lead) {
+          throw new NotFoundException("LEAD_NOT_FOUND");
         }
+      } else {
+        lead = new Lead();
+        lead.is_manually = 1;
+        lead.created_by = userId;
+        lead.created_at = new Date();
+        lead.fk_lead_status_id = 1; // Default as per URS
+        lead.lead_stage = LeadStage.NEW; // Default stage
+        lead.fk_owner_id = userId; // Default owner is the user creating the lead
       }
 
-      // Check for duplicate leads
+      // Validate pregnancy EDD (no backdating)
+      if (!this.validatePregnancyEDD(dto.pregnancy_edd)) {
+        throw new BadRequestException("PREGNANCY_EDD_CANNOT_BE_BACKDATED");
+      }
+
+      // Check for duplicate leads (excluding current lead if updating)
       const duplicateCheck = await this.checkDuplicateLead(
         dto.phone,
         dto.email,
         dto.alternate_phone,
-        dto.alternate_email
+        dto.alternate_email,
+        dto.id
       );
 
       if (duplicateCheck.isDuplicate) {
         throw new Error("DUPLICATE_LEAD_EXISTS");
       }
 
-      // Convert interested products array to comma-separated string
-      const interestedProductsStr = dto.interested_products
-        ? dto.interested_products.join(", ")
-        : null;
+      // Update lead fields
+      lead.first_name = dto.first_name;
+      lead.last_name = dto.last_name;
+      lead.email = dto.email;
+      lead.phone = dto.phone;
+      lead.alternate_phone = dto.alternate_phone;
+      lead.alternate_email = dto.alternate_email;
+      lead.fk_lead_source_id = dto.source_id;
+      lead.fk_lead_medium_id = dto.medium_id;
+      lead.campaign_name = dto.campaign_name;
+      lead.campaign_type = dto.campaign_type;
+      lead.pregnancy_edd = new Date(dto.pregnancy_edd);
+      lead.referrer_crm_number = dto.referrer_crm_number;
+      lead.fk_interested_product_id = dto.fk_interested_product_id;
+      lead.note = dto.note;
 
-      // Create lead entity
-      const lead = this.leadRepository.create({
-        first_name: dto.first_name,
-        last_name: dto.last_name,
-        email: dto.email,
-        phone: dto.phone,
-        alternate_phone: dto.alternate_phone,
-        alternate_email: dto.alternate_email,
-        fk_lead_source_id: dto.source_id,
-        fk_lead_medium_id: dto.medium_id,
-        campaign_name: dto.campaign_name,
-        campaign_type: dto.campaign_type,
-        pregnancy_edd: dto.pregnancy_edd ? new Date(dto.pregnancy_edd) : null,
-        referrer_crm_number: dto.referrer_crm_number,
-        interested_product: interestedProductsStr,
-        note: dto.note || null,
-        fk_lead_status_id: 1, // Default as per URS
-        lead_stage: LeadStage.NEW, // Default stage
-        fk_owner_id: userId, // Owner is the user creating the lead
-        created_by: userId,
-        created_at: new Date(),
-        is_manually: 1,
-      });
+      // Conditional updates for non-mandatory fields (only if ID is provided)
+      if (dto.id) {
+        if (dto.fk_lead_status_id !== undefined) {
+          lead.fk_lead_status_id = dto.fk_lead_status_id;
+        }
+        if (dto.lead_stage !== undefined) {
+          lead.lead_stage = dto.lead_stage as LeadStage;
+        }
+        if (dto.fk_owner_id !== undefined) {
+          lead.fk_owner_id = dto.fk_owner_id;
+        }
+      }
+
+      if (dto.id) {
+        lead.modify_at = new Date();
+        lead.modify_by = userId;
+      }
 
       // Save lead
       const savedLead = await this.leadRepository.save(lead);
 
-      // TODO: As per URS, integrate with Stemcell app to create corresponding lead
-      // and get unique Lead ID from Stemcell
-
       return {
-        message: "LEAD_CREATED_SUCCESSFULLY",
+        message: dto.id
+          ? "LEAD_UPDATED_SUCCESSFULLY"
+          : "LEAD_CREATED_SUCCESSFULLY",
         data: savedLead,
       };
     } catch (error) {
@@ -168,15 +198,7 @@ export class LeadService {
         lead_source,
         medium,
         owner_id,
-        date_from,
-        date_to,
-        pregnancy_edd_from,
-        pregnancy_edd_to,
-        state_id,
-        city_id,
         lead_stage,
-        is_manually,
-        campaign_name,
       } = filters;
 
       const page = Number(pageNumber);
@@ -186,27 +208,46 @@ export class LeadService {
       // Build query with joins
       let query = this.leadRepository
         .createQueryBuilder("leads")
-        .leftJoin(User, "owner_user", "owner_user.id = leads.fk_owner_id")
+        .leftJoin("users", "owner_user", "owner_user.id = leads.fk_owner_id")
+        .leftJoin(
+          "lead_sources_master",
+          "sourceMaster",
+          "sourceMaster.id = leads.fk_lead_source_id"
+        )
+        .leftJoin(
+          "lead_mediums_master",
+          "mediumMaster",
+          "mediumMaster.id = leads.fk_lead_medium_id"
+        )
+        .leftJoin(
+          "lead_products_master",
+          "productMaster",
+          "productMaster.id = leads.fk_interested_product_id"
+        )
+        .leftJoin(
+          "lead_status",
+          "statusMaster",
+          "statusMaster.id = leads.fk_lead_status_id"
+        )
         .select([
           "leads.id as id",
           "leads.lead_id as lead_id",
           "leads.first_name as first_name",
           "leads.last_name as last_name",
+          "CONCAT_WS(' ', leads.first_name, leads.last_name) as name",
           "leads.phone as phone",
           "leads.email as email",
-          "leads.lead_source as source",
-          "leads.medium as medium",
+          "sourceMaster.name as source",
+          "mediumMaster.name as medium",
           "leads.campaign_name as lead_name",
-          "leads.interested_product as product",
+          "productMaster.name as product",
           "leads.pregnancy_edd as edd",
           "leads.call_attempt_count as calls",
           "leads.lead_score as lead_score",
-          "leads.lead_status as lead_status",
+          "statusMaster.name as lead_status",
           "leads.lead_stage as lead_stage",
           "leads.created_at as created_at",
-          "leads.last_contacted_at as last_contacted_at",
-          "COALESCE(owner_agent.first_name, owner_manager.first_name) as owner_first_name",
-          "COALESCE(owner_agent.last_name, owner_manager.last_name) as owner_last_name",
+          "CONCAT_WS(' ', owner_user.first_name, owner_user.last_name) as owner_name",
           "owner_user.email as owner_email",
         ])
         .where("leads.is_deleted = :isDeleted", { isDeleted: 0 });
@@ -219,7 +260,7 @@ export class LeadService {
       } else if (role === RoleType.MANAGER) {
         // Manager can see leads owned by their agents
         query = query.andWhere(
-          "(owner_agent.fk_manager_id = :managerId OR leads.fk_owner_id = :ownerId)",
+          "(owner_user.fk_manager_id = :managerId OR leads.fk_owner_id = :ownerId)",
           { managerId: userId, ownerId: userId }
         );
       }
@@ -227,135 +268,43 @@ export class LeadService {
       // Search filter (name, email, phone)
       if (search) {
         query = query.andWhere(
-          "(leads.first_name LIKE :search OR leads.last_name LIKE :search OR leads.email LIKE :search OR leads.phone LIKE :search OR leads.campaign_name LIKE :search)",
+          "(leads.first_name LIKE :search OR leads.last_name LIKE :search OR leads.email LIKE :search OR leads.phone LIKE :search)",
           { search: `%${search}%` }
         );
       }
 
       // Lead status filter
       if (lead_status) {
-        if (Array.isArray(lead_status)) {
-          query = query.andWhere("leads.lead_status IN (:...statuses)", {
-            statuses: lead_status,
-          });
-        } else {
-          query = query.andWhere("leads.lead_status = :status", {
-            status: lead_status,
-          });
-        }
+        query = query.andWhere("leads.fk_lead_status_id = :status", {
+          status: lead_status,
+        });
       }
 
       // Lead source filter
       if (lead_source) {
-        if (Array.isArray(lead_source)) {
-          query = query.andWhere("leads.lead_source IN (:...sources)", {
-            sources: lead_source,
-          });
-        } else {
-          query = query.andWhere("leads.lead_source = :source", {
-            source: lead_source,
-          });
-        }
+        query = query.andWhere("leads.fk_lead_source_id = :source", {
+          source: lead_source,
+        });
       }
 
       // Medium filter
       if (medium) {
-        if (Array.isArray(medium)) {
-          query = query.andWhere("leads.medium IN (:...mediums)", {
-            mediums: medium,
-          });
-        } else {
-          query = query.andWhere("leads.medium = :medium", { medium });
-        }
+        query = query.andWhere("leads.fk_lead_medium_id = :medium", {
+          medium,
+        });
       }
 
       // Owner filter
       if (owner_id) {
-        if (Array.isArray(owner_id)) {
-          query = query.andWhere("leads.fk_owner_id IN (:...ownerIds)", {
-            ownerIds: owner_id,
-          });
-        } else {
-          query = query.andWhere("leads.fk_owner_id = :ownerId", {
-            ownerId: owner_id,
-          });
-        }
-      }
-
-      // Date range filter (created_at)
-      if (date_from) {
-        query = query.andWhere("leads.created_at >= :dateFrom", {
-          dateFrom: new Date(date_from),
+        query = query.andWhere("leads.fk_owner_id = :ownerId", {
+          ownerId: owner_id,
         });
-      }
-      if (date_to) {
-        query = query.andWhere("leads.created_at <= :dateTo", {
-          dateTo: new Date(date_to),
-        });
-      }
-
-      // Pregnancy EDD range filter
-      if (pregnancy_edd_from) {
-        query = query.andWhere("leads.pregnancy_edd >= :eddFrom", {
-          eddFrom: new Date(pregnancy_edd_from),
-        });
-      }
-      if (pregnancy_edd_to) {
-        query = query.andWhere("leads.pregnancy_edd <= :eddTo", {
-          eddTo: new Date(pregnancy_edd_to),
-        });
-      }
-
-      // State filter
-      if (state_id) {
-        if (Array.isArray(state_id)) {
-          query = query.andWhere("leads.state_id IN (:...stateIds)", {
-            stateIds: state_id,
-          });
-        } else {
-          query = query.andWhere("leads.state_id = :stateId", {
-            stateId: state_id,
-          });
-        }
-      }
-
-      // City filter
-      if (city_id) {
-        if (Array.isArray(city_id)) {
-          query = query.andWhere("leads.city_id IN (:...cityIds)", {
-            cityIds: city_id,
-          });
-        } else {
-          query = query.andWhere("leads.city_id = :cityId", {
-            cityId: city_id,
-          });
-        }
       }
 
       // Lead stage filter
       if (lead_stage) {
-        if (Array.isArray(lead_stage)) {
-          query = query.andWhere("leads.lead_stage IN (:...stages)", {
-            stages: lead_stage,
-          });
-        } else {
-          query = query.andWhere("leads.lead_stage = :stage", {
-            stage: lead_stage,
-          });
-        }
-      }
-
-      // Manual lead filter
-      if (is_manually !== undefined && is_manually !== null) {
-        query = query.andWhere("leads.is_manually = :isManually", {
-          isManually: Number(is_manually),
-        });
-      }
-
-      // Campaign name filter
-      if (campaign_name) {
-        query = query.andWhere("leads.campaign_name LIKE :campaignName", {
-          campaignName: `%${campaign_name}%`,
+        query = query.andWhere("leads.lead_stage = :stage", {
+          stage: lead_stage,
         });
       }
 

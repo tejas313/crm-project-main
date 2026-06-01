@@ -1,19 +1,16 @@
-import {
-  Controller,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
-import { TaskService } from "./task.service";
+import { DialerService } from "./dialer.service";
 import { AuthGuard } from "../../guard/auth.guard";
 import { ResponseService } from "../../common/response.service";
 
-@ApiTags("Tasks")
-@Controller("tasks")
+@ApiTags("Dialer")
+@Controller("dialer")
 @UseGuards(AuthGuard)
 @ApiBearerAuth("authorization")
-export class TaskController {
+export class DialerController {
   constructor(
-    private readonly taskService: TaskService,
+    private readonly dialerService: DialerService,
     private readonly responseService: ResponseService
   ) {}
 }

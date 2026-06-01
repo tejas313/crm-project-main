@@ -5,14 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
-  ManyToOne,
-  JoinColumn,
 } from "typeorm";
-import { User } from "../../user/entities/user.entity";
 
-@Entity("lead_mediums_master")
+@Entity("lead_products_master")
 @Index(["is_active"])
-export class LeadMediumMaster {
+export class LeadProductMaster {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -24,13 +21,6 @@ export class LeadMediumMaster {
 
   @CreateDateColumn({ name: "created_at" })
   created_at: Date;
-
-  @Column({ name: "created_by", type: "integer", nullable: true })
-  created_by: number;
-
-  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
-  @JoinColumn({ name: "created_by" })
-  creator: User;
 
   @UpdateDateColumn({ name: "updated_at" })
   updated_at: Date;

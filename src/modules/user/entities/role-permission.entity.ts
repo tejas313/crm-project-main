@@ -22,14 +22,14 @@ export class RolePermission {
   @Column({ name: "fk_module_permission_id", type: "int", nullable: true })
   fk_module_permission_id: number;
 
-  @ManyToOne(() => ModulePermission)
+  @ManyToOne(() => ModulePermission, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_module_permission_id" })
   modulePermission: ModulePermission;
 
   @Column({ name: "fk_role_details_id", type: "int", nullable: true })
   fk_role_details_id: number;
 
-  @ManyToOne(() => RoleDetails)
+  @ManyToOne(() => RoleDetails, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_role_details_id" })
   roleDetails: RoleDetails;
 
@@ -42,7 +42,7 @@ export class RolePermission {
   @Column({ name: "created_by", type: "int", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdBy: User;
 
@@ -55,7 +55,7 @@ export class RolePermission {
   @Column({ name: "modify_by", type: "int", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyBy: User;
 }

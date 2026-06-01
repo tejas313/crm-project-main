@@ -49,7 +49,7 @@ export class IntegrationLog {
   @Column({ name: "fk_lead_id", nullable: true, type: "integer" })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead)
+  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 

@@ -5,53 +5,42 @@ import {
   IsString,
   IsOptional,
   IsDateString,
-  IsEnum,
-  IsArray,
+  IsNumber,
 } from "class-validator";
 
-// Lead Medium enum as per URS
-export enum LeadMedium {
-  DIGITAL = "Digital",
-  REFERRAL = "Referral",
-  HOSPITAL = "Hospital",
-  PARTNERS = "Partners",
-  FMR = "FMR",
-}
-
-// Lead Sources as per URS
-export enum ManualLeadSource {
-  DIGITAL_CS_REFERRAL = "Digital - CS Referral",
-  DIGITAL_FACEBOOK = "Digital - Facebook",
-  DIGITAL_FACEBOOK_INBOUND = "Digital - Facebook Inbound",
-  DIGITAL_GOOGLE_INBOUND = "Digital - Google Inbound",
-  DIGITAL_INBOUND = "Digital - Inbound",
-  DIGITAL_JUSTDIAL = "Digital - Justdial",
-  DIGITAL_NITRO = "Digital - Nitro",
-  DIGITAL_SEM = "Digital - SEM",
-  DIGITAL_WEBSITE = "Digital - Website",
-  DIGITAL_WEBSITE_INBOUND = "Digital - Website Inbound",
-  INBOUND_CALL = "inbound call",
-  DIGITAL_INSTAGRAM = "Digital - Instagram",
-  DIGITAL_HOSPITAL = "Digital - Hospital",
-  DIGITAL_WEBINAR = "Digital - Webinar",
-  DIGITAL_NIPT_PNS = "Digital - NIPT / PNS",
-  DIGITAL_REFER_A_FRIEND = "Digital - Refer A Friend Lead",
-  DIGITAL_REFERRAL_RCS = "Digital - Referral RCS",
-  DIGITAL_REFERRAL = "Digital Referral",
-  DIGITAL_RAINBOW_REFERRAL = "Digital-Rainbow Referral",
-  REFER_A_FRIEND_LEAD = "Refer a friend lead",
-  REFERRAL_EC = "Referral EC",
-}
-
-// Interested Products as per URS
-export enum InterestedProduct {
-  BIO_BANK = "Bio Bank",
-  DIAGNOSTICS = "Diagnostics",
-  BIOLOGICS = "Biologics",
-  OTHERS = "Others",
-}
-
 export class CreateLeadDto {
+  @ApiProperty({
+    example: 1,
+    description: "ID of the lead (provide for update)",
+    required: false,
+  })
+  @IsOptional()
+  id?: number;
+
+  @ApiProperty({
+    example: 1,
+    description: "Lead status ID",
+    required: false,
+  })
+  @IsOptional()
+  fk_lead_status_id?: number;
+
+  @ApiProperty({
+    example: "New",
+    description: "Lead Stage",
+    required: false,
+  })
+  @IsOptional()
+  lead_stage?: string;
+
+  @ApiProperty({
+    example: 1,
+    description: "Owner ID",
+    required: false,
+  })
+  @IsOptional()
+  fk_owner_id?: number;
+
   @ApiProperty({ example: "John", description: "First name of the customer" })
   @IsString()
   @IsNotEmpty()
@@ -60,20 +49,20 @@ export class CreateLeadDto {
   @ApiProperty({
     example: "Doe",
     description: "Last name of the customer",
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  last_name?: string;
+  @IsNotEmpty()
+  last_name: string;
 
   @ApiProperty({
     example: "john.doe@example.com",
     description: "Email address",
-    required: false,
+    required: true,
   })
   @IsEmail()
-  @IsOptional()
-  email?: string;
+  @IsNotEmpty()
+  email: string;
 
   @ApiProperty({
     example: "9876543210",
@@ -86,111 +75,88 @@ export class CreateLeadDto {
   @ApiProperty({
     example: "9876543211",
     description: "Alternate mobile number",
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  alternate_phone?: string;
+  @IsNotEmpty()
+  alternate_phone: string;
 
   @ApiProperty({
     example: "john.alternate@example.com",
     description: "Alternate email ID",
-    required: false,
+    required: true,
   })
   @IsEmail()
-  @IsOptional()
-  alternate_email?: string;
+  @IsNotEmpty()
+  alternate_email: string;
 
   @ApiProperty({
     example: "SRC123",
     description: "Source ID",
-    required: false,
+    required: true,
   })
-  @IsString()
-  @IsOptional()
-  source_id?: any;
+  @IsNotEmpty()
+  source_id: any;
 
   @ApiProperty({
     example: "MED123",
     description: "Medium ID",
-    required: false,
+    required: true,
   })
-  @IsString()
-  @IsOptional()
-  medium_id?: any;
-
-  @ApiProperty({
-    example: LeadMedium.DIGITAL,
-    enum: LeadMedium,
-    description: "Lead Medium (mandatory)",
-  })
-  @IsEnum(LeadMedium)
   @IsNotEmpty()
-  medium: LeadMedium;
-
-  @ApiProperty({
-    example: ManualLeadSource.DIGITAL_WEBSITE,
-    enum: ManualLeadSource,
-    description: "Lead Source (mandatory)",
-  })
-  @IsEnum(ManualLeadSource)
-  @IsNotEmpty()
-  lead_source: ManualLeadSource;
+  medium_id: any;
 
   @ApiProperty({
     example: "2026-12-31",
     description: "Pregnancy EDD (Calendar option, no backdating)",
-    required: false,
+    required: true,
   })
   @IsDateString()
-  @IsOptional()
-  pregnancy_edd?: string;
+  @IsNotEmpty()
+  pregnancy_edd: string;
 
   @ApiProperty({
     example: "Campaign ABC",
     description: "Campaign Name",
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  campaign_name?: string;
+  @IsNotEmpty()
+  campaign_name: string;
 
   @ApiProperty({
     example: "Type A",
     description: "Campaign Type",
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  campaign_type?: string;
+  @IsNotEmpty()
+  campaign_type: string;
 
   @ApiProperty({
     example: "CRM12345",
     description: "Referrer CRM number",
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  referrer_crm_number?: string;
+  @IsNotEmpty()
+  referrer_crm_number: string;
 
   @ApiProperty({
-    example: [InterestedProduct.BIO_BANK, InterestedProduct.DIAGNOSTICS],
-    enum: InterestedProduct,
-    isArray: true,
-    description: "Interested products",
-    required: false,
+    example: 1,
+    description: "Interested product ID",
+    required: true,
   })
-  @IsArray()
-  @IsEnum(InterestedProduct, { each: true })
-  @IsOptional()
-  interested_products?: InterestedProduct[];
+  @IsNumber()
+  @IsNotEmpty()
+  fk_interested_product_id: number;
 
   @ApiProperty({
     example: "Customer called and expressed interest in stem cell banking.",
     description: "Initial note to attach to the lead",
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  note?: string;
+  @IsNotEmpty()
+  note: string;
 }

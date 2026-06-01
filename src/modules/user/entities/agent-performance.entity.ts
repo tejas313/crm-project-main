@@ -66,7 +66,7 @@ export class AgentPerformance {
   @Column({ name: "created_by", type: "integer", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdByUser: User;
 
@@ -79,7 +79,7 @@ export class AgentPerformance {
   @Column({ name: "modify_by", type: "integer", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyByUser: User;
 }

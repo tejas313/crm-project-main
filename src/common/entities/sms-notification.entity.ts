@@ -22,7 +22,7 @@ export class SmsNotification {
   @Column({ name: "fk_lead_id", nullable: true, type: "integer" })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead, { onDelete: "SET NULL" })
+  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 

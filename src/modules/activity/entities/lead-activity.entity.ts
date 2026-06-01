@@ -45,7 +45,7 @@ export class LeadActivity {
   @Column({ name: "fk_lead_id", type: "integer", nullable: false })
   fk_lead_id: number;
 
-  @ManyToOne(() => Lead)
+  @ManyToOne(() => Lead, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_lead_id" })
   lead: Lead;
 
@@ -60,35 +60,35 @@ export class LeadActivity {
   @Column({ name: "fk_appointment_id", type: "integer", nullable: true })
   fk_appointment_id: number;
 
-  @ManyToOne(() => Appointment)
+  @ManyToOne(() => Appointment, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_appointment_id" })
   appointment: Appointment;
 
   @Column({ name: "fk_notes_id", type: "integer", nullable: true })
   fk_notes_id: number;
 
-  @ManyToOne(() => Notes)
+  @ManyToOne(() => Notes, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_notes_id" })
   note: Notes;
 
   @Column({ name: "fk_automation_id", type: "integer", nullable: true })
   fk_automation_id: number;
 
-  @ManyToOne(() => Automation)
+  @ManyToOne(() => Automation, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_automation_id" })
   automation: Automation;
 
   @Column({ name: "fk_task_id", type: "integer", nullable: true })
   fk_task_id: number;
 
-  @ManyToOne(() => Task)
+  @ManyToOne(() => Task, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_task_id" })
   task: Task;
 
   @Column({ name: "fk_dialer_id", type: "integer", nullable: true })
   fk_dialer_id: number;
 
-  @ManyToOne(() => DialerCalls)
+  @ManyToOne(() => DialerCalls, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_dialer_id" })
   dialer: DialerCalls;
 
@@ -106,7 +106,7 @@ export class LeadActivity {
   @Column({ name: "created_by", type: "integer", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdByUser: User;
 }

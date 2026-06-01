@@ -20,7 +20,7 @@ export class UserSession {
   @Column({ name: "fk_user_id", type: "integer", nullable: false })
   fk_user_id: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_user_id" })
   user: User;
 

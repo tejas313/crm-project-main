@@ -50,7 +50,7 @@ export class RoleDetails {
   @Column({ name: "modify_by", type: "int", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modify_by_user: User;
 }

@@ -13,6 +13,7 @@ import { User } from "../../user/entities/user.entity";
 import { LeadStatusEntity } from "./lead-status.entity";
 import { LeadSourceMaster } from "./lead-source-master.entity";
 import { LeadMediumMaster } from "./lead-medium-master.entity";
+import { LeadProductMaster } from "./lead-product-master.entity";
 import { LeadAddress } from "./lead-address.entity";
 
 export enum LeadStage {
@@ -37,7 +38,7 @@ export class Lead {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "lead_id", type: "integer", unique: true, nullable: false })
+  @Column({ name: "lead_id", type: "integer", unique: true, nullable: true })
   lead_id: number;
 
   @Column({ name: "first_name", type: "varchar", length: 100 })
@@ -108,13 +109,15 @@ export class Lead {
   @Column({ name: "pregnancy_week", type: "integer", nullable: true })
   pregnancy_week: number;
 
-  @Column({
-    name: "interested_product",
-    length: 255,
-    type: "varchar",
-    nullable: true,
+  @Column({ name: "fk_interested_product_id", type: "integer", nullable: true })
+  fk_interested_product_id: number;
+
+  @ManyToOne(() => LeadProductMaster, {
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
   })
-  interested_product: string;
+  @JoinColumn({ name: "fk_interested_product_id" })
+  interestedProductMaster: LeadProductMaster;
 
   @Column({
     name: "referrer_crm_number",
@@ -128,21 +131,30 @@ export class Lead {
   @Column({ name: "fk_lead_status_id", type: "integer", nullable: true })
   fk_lead_status_id: number;
 
-  @ManyToOne(() => LeadStatusEntity, { onDelete: "SET NULL" })
+  @ManyToOne(() => LeadStatusEntity, {
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
   @JoinColumn({ name: "fk_lead_status_id" })
   leadStatus: LeadStatusEntity;
 
   @Column({ name: "fk_lead_source_id", type: "integer", nullable: true })
   fk_lead_source_id: number;
 
-  @ManyToOne(() => LeadSourceMaster, { onDelete: "SET NULL" })
+  @ManyToOne(() => LeadSourceMaster, {
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
   @JoinColumn({ name: "fk_lead_source_id" })
   leadSourceMaster: LeadSourceMaster;
 
   @Column({ name: "fk_lead_medium_id", type: "integer", nullable: true })
   fk_lead_medium_id: number;
 
-  @ManyToOne(() => LeadMediumMaster, { onDelete: "SET NULL" })
+  @ManyToOne(() => LeadMediumMaster, {
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
   @JoinColumn({ name: "fk_lead_medium_id" })
   leadMediumMaster: LeadMediumMaster;
 
@@ -160,7 +172,7 @@ export class Lead {
   @Column({ name: "fk_owner_id", nullable: true, type: "integer" })
   fk_owner_id: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_owner_id" })
   owner: User;
 
@@ -170,7 +182,7 @@ export class Lead {
   @Column({ name: "assigned_by", nullable: true, type: "integer" })
   assigned_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "assigned_by" })
   assignedByUser: User;
 
@@ -231,7 +243,7 @@ export class Lead {
   @Column({ name: "created_by", type: "integer", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdByUser: User;
 
@@ -244,11 +256,14 @@ export class Lead {
   @Column({ name: "modify_by", type: "integer", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyBy: User;
 
-  @OneToOne(() => LeadAddress, (address) => address.lead)
+  @OneToOne(() => LeadAddress, (address) => address.lead, {
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  })
   leadAddress: LeadAddress;
 
   // Computed property

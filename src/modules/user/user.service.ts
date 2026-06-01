@@ -1,9 +1,17 @@
-import { Injectable } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Not } from "typeorm";
+import { Repository, Not, In } from "typeorm";
 import { User } from "./entities/user.entity";
 import { UserSession } from "./entities/user-session.entity";
-import { AgentLeaveCalendar } from "./entities/agent-leave-calendar.entity";
+import {
+  AgentLeaveCalendar,
+  LeaveType,
+} from "./entities/agent-leave-calendar.entity";
 import { RoleDetails, RoleType } from "./entities/role-details.entity";
 import { Module } from "./entities/module.entity";
 import { ModulePermission } from "./entities/module-permission.entity";
@@ -46,22 +54,78 @@ export class UserService {
   // Add or update role permissions
   async addOrUpdateRolePermissions(dto: any, performedByUserId?: number) {
     try {
-      const { role_details_id, module_permission_id } = dto;
+      const {
+        role_details_id,
+        role_name,
+        role_type,
+        module_permission_id,
+        is_active,
+      } = dto;
 
       // Basic validation
       if (!Array.isArray(module_permission_id)) {
-        return { success: false, message: "INVALID_PERMISSIONS_PAYLOAD" };
+        throw new BadRequestException("INVALID_PERMISSIONS_PAYLOAD");
       }
 
-      // Validate role exists
-      const role = await this.roleDetailsRepository.findOne({
-        where: { id: role_details_id, is_deleted: 0 },
-      });
-      if (!role) return { success: false, message: "ROLE_NOT_FOUND" };
+      let resolvedRoleId: number = role_details_id;
+      let isNewRole = false;
+
+      // If role_details_id not provided, create a new role first
+      if (!resolvedRoleId) {
+        if (!role_name || !role_type) {
+          throw new BadRequestException(
+            "ROLE_NAME_AND_ROLE_TYPE_REQUIRED_WHEN_ROLE_ID_NOT_PROVIDED"
+          );
+        }
+        const existingRole = await this.roleDetailsRepository.findOne({
+          where: { role_name: role_name, is_deleted: 0 },
+        });
+        if (existingRole) {
+          throw new Error("ROLE_NAME_ALREADY_EXISTS");
+        }
+        const newRole = this.roleDetailsRepository.create({
+          role_name,
+          role_type: (role_type as RoleType) || RoleType.AGENT,
+          is_active: is_active !== undefined ? is_active : 1,
+          is_deleted: 0,
+        });
+        const savedRole = await this.roleDetailsRepository.save(newRole);
+        resolvedRoleId = savedRole.id;
+        isNewRole = true;
+      } else {
+        // Validate that the provided role exists
+        const role = await this.roleDetailsRepository.findOne({
+          where: { id: resolvedRoleId, is_deleted: 0 },
+        });
+        if (!role) throw new NotFoundException("ROLE_NOT_FOUND");
+
+        if (role_name) {
+          // Check if another role details already has this role_name
+          const existingRole = await this.roleDetailsRepository.findOne({
+            where: { role_name, id: Not(resolvedRoleId), is_deleted: 0 },
+          });
+          if (existingRole) {
+            throw new Error("ROLE_NAME_ALREADY_EXISTS");
+          }
+          role.role_name = role_name;
+        }
+
+        if (role_type) {
+          role.role_type = role_type as RoleType;
+        }
+
+        if (is_active !== undefined) {
+          role.is_active = is_active;
+        }
+
+        role.modify_at = new Date();
+        role.modify_by = performedByUserId || null;
+        await this.roleDetailsRepository.save(role);
+      }
 
       // Fetch all permissions rows for this role (including deleted ones)
       const existingRows = await this.rolePermissionRepository.find({
-        where: { fk_role_details_id: role_details_id },
+        where: { fk_role_details_id: resolvedRoleId },
       });
 
       const existingMap = new Map<number, any>();
@@ -72,6 +136,20 @@ export class UserService {
       const incomingPerms = Array.from(
         new Set(module_permission_id.map((p: any) => Number(p)))
       );
+
+      // Validate that all module_permission_id exist in module_permission table
+      if (incomingPerms.length > 0) {
+        const validPermissions = await this.modulePermissionRepository.find({
+          where: { id: In(incomingPerms), is_deleted: 0 },
+        });
+
+        if (validPermissions.length !== incomingPerms.length) {
+          throw new BadRequestException(
+            "ONE_OR_MORE_MODULE_PERMISSIONS_NOT_FOUND"
+          );
+        }
+      }
+
       const incomingSet = new Set(incomingPerms);
 
       const toCreate: number[] = [];
@@ -108,7 +186,7 @@ export class UserService {
       if (toCreate.length) {
         const created = toCreate.map((perm) =>
           this.rolePermissionRepository.create({
-            fk_role_details_id: role_details_id,
+            fk_role_details_id: resolvedRoleId,
             fk_module_permission_id: perm,
             created_by: performedByUserId || null,
           })
@@ -116,11 +194,19 @@ export class UserService {
         await this.rolePermissionRepository.save(created);
       }
 
-      if (toReactivate.length) await this.rolePermissionRepository.save(toReactivate);
+      if (toReactivate.length)
+        await this.rolePermissionRepository.save(toReactivate);
       if (toDelete.length) await this.rolePermissionRepository.save(toDelete);
 
-      return { success: true, message: "ROLE_PERMISSIONS_UPDATED" };
+      return {
+        success: true,
+        message: isNewRole
+          ? "ROLE_CREATED_SUCCESSFULLY"
+          : "ROLE_UPDATED_SUCCESSFULLY",
+        role_details_id: resolvedRoleId,
+      };
     } catch (error) {
+      console.log("error", error);
       throw error;
     }
   }
@@ -128,7 +214,7 @@ export class UserService {
   private async checkEmailAvailability(
     email: string,
     currentUserId?: number
-  ): Promise<{ success: boolean; message?: string }> {
+  ): Promise<void> {
     // Check only users table
     const query = currentUserId
       ? { email, id: Not(currentUserId), is_deleted: 0 }
@@ -139,16 +225,14 @@ export class UserService {
     });
 
     if (existingUser) {
-      return { success: false, message: "EMAIL_ALREADY_EXISTS" };
+      throw new Error("EMAIL_ALREADY_EXISTS");
     }
-
-    return { success: true };
   }
 
   private async checkPhoneAvailability(
     phone: string,
     currentUserId?: number
-  ): Promise<{ success: boolean; message?: string }> {
+  ): Promise<void> {
     // Check only users table
     const query = currentUserId
       ? { phone, id: Not(currentUserId), is_deleted: 0 }
@@ -159,10 +243,8 @@ export class UserService {
     });
 
     if (existingUser) {
-      return { success: false, message: "PHONE_ALREADY_EXISTS" };
+      throw new Error("PHONE_ALREADY_EXISTS");
     }
-
-    return { success: true };
   }
 
   async login(loginDto: LoginDto) {
@@ -171,19 +253,23 @@ export class UserService {
 
       // Find user by email
       const user = await this.userRepository.findOne({
-        where: { email },
+        where: { email, is_deleted: 0 },
         relations: ["roleDetails"],
       });
 
       if (!user) {
-        return { success: false, message: "USER_NOT_FOUND" };
+        throw new UnauthorizedException("USER_NOT_FOUND");
+      }
+
+      if (user.is_active === 0) {
+        throw new UnauthorizedException("USER_BLOCKED");
       }
 
       // Check password
       const isPasswordValid = await bcrypt.compare(password, user.password);
 
       if (!isPasswordValid) {
-        return { success: false, message: "INVALID_CREDENTIALS" };
+        throw new UnauthorizedException("INVALID_CREDENTIALS");
       }
 
       // Same payload for both tokens
@@ -199,7 +285,7 @@ export class UserService {
 
       // Refresh token with different expiry
       const refreshToken = await this.jwtService.signAsync(payload, {
-        expiresIn: this.configService.get("REFRESH_EXPIRE_TIME") || "7d",
+        expiresIn: this.configService.get("REFRESH_EXPIRE_TIME") || "1d",
       });
 
       // Calculate expiry dates for database storage
@@ -250,12 +336,12 @@ export class UserService {
 
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user) {
-        return { success: false, message: "USER_NOT_FOUND" };
+        throw new NotFoundException("USER_NOT_FOUND");
       }
 
       const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
       if (!isPasswordValid) {
-        return { success: false, message: "INVALID_OLD_PASSWORD" };
+        throw new UnauthorizedException("INVALID_OLD_PASSWORD");
       }
 
       const saltRounds = parseInt(
@@ -277,6 +363,16 @@ export class UserService {
   // Unified Add or Edit User
   async addOrEditUser(dto: AddOrEditUserDto) {
     try {
+      let user: User | null = null;
+      if (dto.id) {
+        // Edit mode
+        user = await this.userRepository.findOne({
+          where: { id: dto.id, is_deleted: 0 },
+          relations: ["roleDetails"],
+        });
+        if (!user) throw new NotFoundException("USER_NOT_FOUND");
+      }
+
       // Validate role_id if provided
       let roleDetails: RoleDetails | null = null;
       if (dto.role_id) {
@@ -284,28 +380,41 @@ export class UserService {
           where: { id: dto.role_id, is_deleted: 0 },
         });
         if (!roleDetails) {
-          return { success: false, message: "ROLE_NOT_FOUND" };
+          throw new NotFoundException("ROLE_NOT_FOUND");
         }
       }
 
+      // Validate fk_manager_id if provided
+      if (dto.fk_manager_id) {
+        const manager = await this.userRepository.findOne({
+          where: { id: dto.fk_manager_id, is_deleted: 0 },
+          relations: ["roleDetails"],
+        });
+        if (!manager) {
+          throw new NotFoundException("MANAGER_NOT_FOUND");
+        }
+        if (manager.roleDetails?.role_type !== RoleType.MANAGER) {
+          throw new BadRequestException("SELECTED_USER_IS_NOT_A_MANAGER");
+        }
+      }
+
+      // Check if manager is required for Agent role
+      const effectiveRoleType = roleDetails
+        ? roleDetails.role_type
+        : user?.roleDetails?.role_type;
+      if (effectiveRoleType === RoleType.AGENT && !dto.fk_manager_id) {
+        throw new BadRequestException("MANAGER_ID_REQUIRED_FOR_AGENT_ROLE");
+      }
+
       // Check email availability
-      const emailCheck = await this.checkEmailAvailability(dto.email, dto.id);
-      if (!emailCheck.success) return emailCheck;
+      await this.checkEmailAvailability(dto.email, dto.id);
 
       // Check phone availability if provided
       if (dto.phone) {
-        const phoneCheck = await this.checkPhoneAvailability(dto.phone, dto.id);
-        if (!phoneCheck.success) return phoneCheck;
+        await this.checkPhoneAvailability(dto.phone, dto.id);
       }
 
-      let user: User;
-      if (dto.id) {
-        // Edit mode
-        user = await this.userRepository.findOne({
-          where: { id: dto.id, is_deleted: 0 },
-        });
-        if (!user) return { success: false, message: "USER_NOT_FOUND" };
-      } else {
+      if (!user) {
         // Add mode
         user = new User();
       }
@@ -315,11 +424,8 @@ export class UserService {
       user.email = dto.email;
       user.phone = dto.phone || null;
       user.fk_manager_id = dto.fk_manager_id || null;
-
       if (roleDetails) {
         user.fk_role_id = roleDetails.id;
-      } else {
-        user.fk_role_id = dto.role_id || null;
       }
 
       // Use password from DTO if provided
@@ -365,54 +471,51 @@ export class UserService {
         relations: ["roleDetails"],
       });
       if (!user || user.roleDetails?.role_type !== RoleType.AGENT) {
-        return { success: false, message: "ONLY_AGENTS_CAN_ADD_LEAVE" };
+        throw new UnauthorizedException("ONLY_AGENTS_CAN_ADD_LEAVE");
       }
 
-      const startDate = new Date(dto.leave_start_date);
-      const endDate = new Date(dto.leave_end_date);
+      const { leave_start_date, leave_end_date } = dto;
+
+      const today = new Date().toISOString().split("T")[0];
+
+      // Validation: start and end dates should be today or in the future
+      if (leave_start_date < today || leave_end_date < today) {
+        throw new BadRequestException("LEAVE_DATES_CANNOT_BE_IN_PAST");
+      }
 
       // Basic validation: start should not be after end
-      if (startDate > endDate) {
-        return { success: false, message: "INVALID_LEAVE_DATE_RANGE" };
+      if (leave_start_date > leave_end_date) {
+        throw new BadRequestException("INVALID_LEAVE_DATE_RANGE");
       }
 
-      // Normalize dates to YYYY-MM-DD (avoid timezone issues and compare only date portion)
-      const formatDateOnly = (d: Date) => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-      };
-
-      const startDateStr = formatDateOnly(startDate);
-      const endDateStr = formatDateOnly(endDate);
-
-      // If agent already has a leave with the same start date OR same end date (and not cancelled), don't add
+      // If agent already has a leave that overlaps with this range, don't add
       const existing = await this.agentLeaveCalendarRepository
         .createQueryBuilder("lc")
-        .select("lc.id", "id")
         .where("lc.fk_agent_id = :agentId", { agentId: userId })
-        .andWhere(
-          "(lc.leave_start_date = :startDate OR lc.leave_end_date = :endDate)",
-          { startDate: startDateStr, endDate: endDateStr }
-        )
         .andWhere("lc.is_cancel = :isCancel", { isCancel: 0 })
+        .andWhere("lc.is_deleted = :isDeleted", { isDeleted: 0 })
+        .andWhere(
+          "(lc.leave_start_date <= :leave_end_date AND lc.leave_end_date >= :leave_start_date)",
+          { leave_start_date, leave_end_date }
+        )
         .getRawOne();
 
       if (existing) {
-        return { success: false, message: "LEAVE_ALREADY_EXISTS_FOR_DATE" };
+        throw new BadRequestException("LEAVE_ALREADY_EXISTS_FOR_THIS_RANGE");
       }
 
       // Calculate difference in days (+1 to include both start and end days)
+      const startDate = new Date(leave_start_date);
+      const endDate = new Date(leave_end_date);
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
       const leaveCount = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
       const leave = this.agentLeaveCalendarRepository.create({
         fk_agent_id: userId,
-        leave_start_date: startDate,
-        leave_end_date: endDate,
+        leave_start_date: leave_start_date,
+        leave_end_date: leave_end_date,
         leave_count: leaveCount,
-        leave_type: dto.leave_type,
+        leave_type: dto.leave_type as LeaveType,
         reason: dto.reason,
         is_cancel: 0,
       });
@@ -464,7 +567,7 @@ export class UserService {
       const blockCount = await this.userRepository
         .createQueryBuilder("user")
         .leftJoin("user.roleDetails", "roleDetails")
-        .where("user.is_blocked = 1")
+        .where("user.is_active = 0")
         .andWhere("user.is_deleted = 0")
         .andWhere("roleDetails.role_type != :adminType", {
           adminType: RoleType.ADMIN,
@@ -477,12 +580,23 @@ export class UserService {
         .select([
           "users.id as id",
           "CONCAT_WS(' ', users.first_name, users.last_name) as name",
+          "users.first_name AS first_name",
+          "users.last_name as last_name",
           "users.email as email",
           "users.phone as phone",
           "roleDetails.role_type as role",
-          "IF(users.is_blocked = 1, 'Blocked', 'Active') as status",
-          "COALESCE(CONCAT_WS(' ', (select mu.first_name, mu.last_name from users mu where mu.id=users.id)), '-') as manager",
+          "roleDetails.role_name as role_name",
+          "users.is_active as is_active",
+          `COALESCE(
+  (
+    SELECT CONCAT_WS(' ', mu.first_name, mu.last_name)
+    FROM users mu
+    WHERE mu.id = users.id
+  ),
+  '-'
+) AS manager`,
           "users.created_at as created_at",
+          " DATE_FORMAT(users.modify_at, '%Y-%m-%d') AS modify_at",
           "users.updated_at as updated_at",
         ])
         .where("users.is_deleted = 0")
@@ -502,11 +616,7 @@ export class UserService {
       }
 
       if (status) {
-        if (status === "Active") {
-          query = query.andWhere("users.is_blocked = false");
-        } else if (status === "Blocked") {
-          query = query.andWhere("users.is_blocked = true");
-        }
+        query = query.andWhere(`users.is_active = ${status}`);
       }
 
       query = query.orderBy("users.created_at", "DESC");
@@ -542,24 +652,26 @@ export class UserService {
     }
   }
 
-  async blockUnblockUser(dto: UserByIdDto) {
+  async blockOrUnblockUser(dto: UserByIdDto, performedByUserId?: number) {
     try {
       const user = await this.userRepository.findOne({
         where: { id: dto.id, is_deleted: 0 },
       });
       if (!user) {
-        return { success: false, message: "USER_NOT_FOUND" };
+        throw new NotFoundException("USER_NOT_FOUND");
       }
 
-      user.is_blocked = user.is_blocked ? 0 : 1; // Auto-toggle!
+      user.is_active = user.is_active === 1 ? 0 : 1; // Auto-toggle!
       user.modify_at = new Date();
+      user.modify_by = performedByUserId || null;
       await this.userRepository.save(user);
 
       return {
         success: true,
-        message: user.is_blocked
-          ? "USER_BLOCKED_SUCCESS"
-          : "USER_UNBLOCKED_SUCCESS",
+        message:
+          user.is_active === 0
+            ? "USER_BLOCKED_SUCCESS"
+            : "USER_UNBLOCKED_SUCCESS",
       };
     } catch (error) {
       throw error;
@@ -572,11 +684,12 @@ export class UserService {
         where: { id: dto.id, is_deleted: 0 },
       });
       if (!user) {
-        return { success: false, message: "USER_NOT_FOUND" };
+        throw new NotFoundException("USER_NOT_FOUND");
       }
 
       user.is_deleted = 1;
       user.modify_at = new Date();
+      user.modify_by = deletedByUserId || null;
       await this.userRepository.save(user);
 
       return {
@@ -595,7 +708,7 @@ export class UserService {
         relations: ["roleDetails"],
       });
       if (!user) {
-        return { success: false, message: "USER_NOT_FOUND" };
+        throw new NotFoundException("USER_NOT_FOUND");
       }
 
       return {
@@ -608,7 +721,6 @@ export class UserService {
           phone: user.phone,
           role: user.roleDetails?.role_type || null,
           role_id: user.fk_role_id,
-          is_blocked: user.is_blocked,
           is_active: user.is_active,
           fk_manager_id: user.fk_manager_id,
           created_at: user.created_at,
@@ -620,16 +732,14 @@ export class UserService {
     }
   }
 
-  async getUserRolePermissions(userId: number) {
+  async getUserRolePermissions(roleId: number) {
     try {
-      const user = await this.userRepository.findOne({
-        where: { id: userId, is_deleted: 0 },
+      const role = await this.roleDetailsRepository.findOne({
+        where: { id: roleId, is_deleted: 0 },
       });
-      if (!user) {
-        return { success: false, message: "USER_NOT_FOUND" };
+      if (!role) {
+        throw new NotFoundException("ROLE_NOT_FOUND");
       }
-
-      const roleId = user.fk_role_id;
 
       const [modules, modulePermissions, rolePermissions] = await Promise.all([
         this.moduleRepository.find({
@@ -730,16 +840,15 @@ export class UserService {
         .leftJoin(User, "users", "users.id = agent_leave_calendar.fk_agent_id")
         .select([
           "agent_leave_calendar.id as leave_id",
-          "agent_leave_calendar.leave_start_date as leave_start_date",
-          "agent_leave_calendar.leave_end_date as leave_end_date",
+          "DATE_FORMAT(agent_leave_calendar.leave_start_date, '%Y-%m-%d') as leave_start_date",
+          "DATE_FORMAT(agent_leave_calendar.leave_end_date, '%Y-%m-%d') as leave_end_date",
           "agent_leave_calendar.leave_count as leave_count",
           "agent_leave_calendar.leave_type as leave_type",
           "agent_leave_calendar.reason as reason",
           "agent_leave_calendar.is_cancel as is_cancel",
           "agent_leave_calendar.created_at as created_at",
           "users.email as agent_email",
-          "users.first_name as agent_first_name",
-          "users.last_name as agent_last_name",
+          "CONCAT_WS(' ', users.first_name, users.last_name) as agent_name",
         ]);
 
       if (role === RoleType.AGENT) {

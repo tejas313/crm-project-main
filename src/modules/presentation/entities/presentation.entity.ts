@@ -186,7 +186,7 @@ export class Presentation {
   @Column({ name: "created_by", nullable: true, type: "integer" })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   created_by_user: User;
 
@@ -199,7 +199,7 @@ export class Presentation {
   @Column({ name: "modify_by", type: "integer", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyByUser: User;
 }

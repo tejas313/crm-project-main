@@ -10,6 +10,13 @@ import {
 } from "typeorm";
 import { User } from "./user.entity";
 
+export enum LeaveType {
+  PAID_LEAVE = "Paid Leave",
+  SICK = "Sick",
+  CASUAL = "Casual",
+  UNPAID = "Unpaid",
+}
+
 @Entity("agent_leave_calendar")
 @Index(["fk_agent_id"])
 @Index(["leave_start_date"])
@@ -37,8 +44,13 @@ export class AgentLeaveCalendar {
   @Column({ name: "is_cancel", type: "smallint", default: 0 })
   is_cancel: number;
 
-  @Column({ name: "leave_type", length: 50, nullable: true })
-  leave_type: string;
+  @Column({
+    name: "leave_type",
+    type: "enum",
+    enum: LeaveType,
+    nullable: true,
+  })
+  leave_type: LeaveType;
 
   @Column({ name: "reason", type: "text", nullable: true })
   reason: string;
@@ -52,7 +64,7 @@ export class AgentLeaveCalendar {
   @Column({ name: "created_by", type: "integer", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdByUser: User;
 
@@ -65,7 +77,7 @@ export class AgentLeaveCalendar {
   @Column({ name: "modify_by", type: "integer", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyByUser: User;
 }

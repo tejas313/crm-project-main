@@ -9,7 +9,13 @@ import {
   UseGuards,
   Query,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from "@nestjs/swagger";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
 import { UserService } from "./user.service";
 import { LoginDto } from "./login.dto";
 import { ChangePasswordDto } from "./change-password.dto";
@@ -40,7 +46,7 @@ export class UserController {
   @ApiOperation({ summary: "User login" })
   @ApiHeader({
     name: "authorizations",
-    description: "Authorization header",
+    description: "Defualt Authorization header",
     required: true,
   })
   @ApiResponse({ status: 200, description: "Login successful" })
@@ -53,11 +59,7 @@ export class UserController {
   ) {
     try {
       const result = await this.userService.login(loginDto);
-      return this.responseService.success(
-        res,
-        result.message || "SUCCESS",
-        result
-      );
+      return this.responseService.success(res, "LOGIN_SUCCESS", result);
     } catch (error: any) {
       if (error.status) {
         this.responseService.error(req, res, error.message, error.status);
@@ -67,16 +69,10 @@ export class UserController {
     }
   }
 
-  @Post("change-password")
+  @Post("changePassword")
   @UseGuards(AuthGuard)
-  @ApiHeader({
-    name: "authorizations",
-    description: "Authorization token",
-    required: true,
-  })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Change user password" })
-  @ApiResponse({ status: 200, description: "Password changed successfully" })
-  @ApiResponse({ status: 400, description: "Invalid old password" })
   async changePassword(
     @Body() changePasswordDto: ChangePasswordDto,
     @Req() req: any,
@@ -89,11 +85,7 @@ export class UserController {
         changePasswordDto
       );
 
-      return this.responseService.success(
-        res,
-        result.message || "SUCCESS",
-        result
-      );
+      return this.responseService.success(res, result.message, result);
     } catch (error: any) {
       if (error.status) {
         this.responseService.error(req, res, error.message, error.status);
@@ -104,13 +96,9 @@ export class UserController {
   }
 
   // Unified Add or Edit User (Manager or Agent)
-  @Post("add-or-edit-user")
+  @Post("addOrEditUser")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
-  @ApiOperation({
-    summary:
-      "Add or Edit User - Unified endpoint for Manager and Agent (Admin only)",
-  })
+  @ApiBearerAuth("authorization")
   async addOrEditUser(
     @Body() dto: AddOrEditUserDto,
     @Req() req: any,
@@ -133,11 +121,10 @@ export class UserController {
   }
 
   // Add or Update Role Permissions
-  @Post("add-permissions")
+  @Post("addOrUpdateRolePermissions")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
-  @ApiOperation({ summary: "Add or Update Role Permissions (Admin only)" })
-  async addPermissions(
+  @ApiBearerAuth("authorization")
+  async addOrUpdateRolePermissions(
     @Body() dto: AddRolePermissionsDto,
     @Req() req: any,
     @Res() res: Response
@@ -154,6 +141,7 @@ export class UserController {
 
       return this.responseService.success(res, result.message, result);
     } catch (error: any) {
+      console.log("error", error);
       if (error.status) {
         this.responseService.error(req, res, error.message, error.status);
       } else {
@@ -163,9 +151,9 @@ export class UserController {
   }
 
   // Agent Leave Endpoints
-  @Post("add-leave")
+  @Post("addLeave")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Add Agent Leave" })
   async addLeave(
     @Body() dto: AgentLeaveDto,
@@ -187,9 +175,9 @@ export class UserController {
     }
   }
 
-  @Get("user-list")
+  @Get("getUserList")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({
     summary: "Get User List with pagination, filters, and counts (Admin only)",
   })
@@ -205,7 +193,7 @@ export class UserController {
       const result = await this.userService.getUserList(query);
       return this.responseService.success(
         res,
-        "User list retrieved successfully",
+        "USER_LIST_RETRIEVED_SUCCESS",
         result
       );
     } catch (error: any) {
@@ -217,9 +205,9 @@ export class UserController {
     }
   }
 
-  @Get("userDetailsbyId")
+  @Get("getUserDetailsById")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Get User Details by ID (Admin only)" })
   async getUserDetailsById(
     @Query("id") id: string,
@@ -233,7 +221,7 @@ export class UserController {
       const result = await this.userService.getUserDetailsById(Number(id));
       return this.responseService.success(
         res,
-        "User details retrieved successfully",
+        "USER_DETAILS_RETRIEVED_SUCCESS",
         result
       );
     } catch (error: any) {
@@ -245,9 +233,9 @@ export class UserController {
     }
   }
 
-  @Get("permissionList")
+  @Get("getPermissionList")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({
     summary: "Get Hierarchical List of Permissions (Admin only)",
   })
@@ -259,7 +247,7 @@ export class UserController {
       const result = await this.userService.getPermissionList();
       return this.responseService.success(
         res,
-        "Permission list retrieved successfully",
+        "PERMISSION_LIST_RETRIEVED_SUCCESS",
         result
       );
     } catch (error: any) {
@@ -271,9 +259,9 @@ export class UserController {
     }
   }
 
-  @Get("userRolePermissions")
+  @Get("getUserRolePermissions")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Get User Role Permissions (Admin only)" })
   async getUserRolePermissions(
     @Query("id") id: string,
@@ -287,7 +275,7 @@ export class UserController {
       const result = await this.userService.getUserRolePermissions(Number(id));
       return this.responseService.success(
         res,
-        "User role permissions retrieved successfully",
+        "USER_ROLE_PERMISSIONS_RETRIEVED_SUCCESS",
         result
       );
     } catch (error: any) {
@@ -299,9 +287,9 @@ export class UserController {
     }
   }
 
-  @Post("block-unblock")
+  @Post("blockOrUnblockUser")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Block or Unblock User (Admin only)" })
   async blockUnblockUser(
     @Body() dto: UserByIdDto,
@@ -312,7 +300,10 @@ export class UserController {
       if (req.user.role !== RoleType.ADMIN) {
         return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
       }
-      const result = await this.userService.blockUnblockUser(dto);
+      const result = await this.userService.blockOrUnblockUser(
+        dto,
+        req.user.userId
+      );
       return this.responseService.success(res, result.message, result);
     } catch (error: any) {
       if (error.status) {
@@ -323,9 +314,9 @@ export class UserController {
     }
   }
 
-  @Post("delete")
+  @Post("deleteUser")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Delete User (Admin only)" })
   async deleteUser(
     @Body() dto: UserByIdDto,
@@ -348,9 +339,9 @@ export class UserController {
     }
   }
 
-  @Get("leave-list")
+  @Get("getLeaveList")
   @UseGuards(AuthGuard)
-  @ApiHeader({ name: "authorizations", required: true })
+  @ApiBearerAuth("authorization")
   @ApiOperation({ summary: "Get Leave List based on Role" })
   async getLeaveList(
     @Query() query: LeaveListDto,
@@ -358,14 +349,14 @@ export class UserController {
     @Res() res: Response
   ) {
     try {
-      const roleId = req.user.role_id;
+      const userId = req.user.userId;
       const role = req.user.role;
 
-      const result = await this.userService.getLeaveList(roleId, role, query);
+      const result = await this.userService.getLeaveList(userId, role, query);
 
       return this.responseService.success(
         res,
-        "Leave list retrieved successfully",
+        "LEAVE_LIST_RETRIEVED_SUCCESS",
         result
       );
     } catch (error: any) {

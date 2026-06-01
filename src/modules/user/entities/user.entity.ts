@@ -49,15 +49,12 @@ export class User {
   @Column({ name: "fk_manager_id", type: "int", nullable: true })
   fk_manager_id: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "fk_manager_id" })
   manager: User;
 
   @Column({ name: "is_active", type: "smallint", default: 1 })
   is_active: number;
-
-  @Column({ name: "is_blocked", type: "smallint", default: 0 })
-  is_blocked: number;
 
   @Column({ name: "password_changed_at", type: "timestamp", nullable: true })
   password_changed_at: Date;
@@ -80,7 +77,7 @@ export class User {
   @Column({ name: "created_by", type: "int", nullable: true })
   created_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "created_by" })
   createdBy: User;
 
@@ -93,7 +90,7 @@ export class User {
   @Column({ name: "modify_by", type: "int", nullable: true })
   modify_by: number;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn({ name: "modify_by" })
   modifyBy: User;
 }

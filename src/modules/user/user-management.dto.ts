@@ -7,8 +7,10 @@ import {
   IsNumber,
   IsEnum,
   Matches,
+  IsArray,
 } from "class-validator";
 import { RoleType } from "./entities/role-details.entity";
+import { LeaveType } from "./entities/agent-leave-calendar.entity";
 
 export class AddOrEditUserDto {
   @ApiProperty({
@@ -19,17 +21,6 @@ export class AddOrEditUserDto {
   @IsOptional()
   @IsNumber()
   id?: number;
-
-  @ApiProperty({
-    example: "Manager",
-    description: "User role: Manager or Agent",
-    enum: [RoleType.MANAGER, RoleType.AGENT],
-  })
-  @IsEnum([RoleType.MANAGER, RoleType.AGENT], {
-    message: "Role must be either Manager or Agent",
-  })
-  @IsNotEmpty()
-  role: RoleType;
 
   @ApiProperty({ example: "John" })
   @IsString()
@@ -178,10 +169,14 @@ export class AgentLeaveDto {
   @IsString()
   leave_end_date: string;
 
-  @ApiProperty({ example: "Paid leave" })
+  @ApiProperty({
+    example: LeaveType.PAID_LEAVE,
+    enum: LeaveType,
+    required: false,
+  })
   @IsOptional()
-  @IsString()
-  leave_type?: string;
+  @IsEnum(LeaveType)
+  leave_type?: LeaveType;
 
   @ApiProperty({ example: "Going out of town" })
   @IsOptional()
@@ -209,14 +204,36 @@ export class LeaveListDto {
 }
 
 export class AddRolePermissionsDto {
+  @ApiProperty({
+    example: 1,
+    description: "ID of the role (leave empty to create new role)",
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  role_details_id?: number;
+
+  @ApiProperty({ example: "Custom Role" })
+  @IsNotEmpty()
+  @IsString()
+  role_name: string;
+
+  @ApiProperty({
+    example: RoleType.AGENT,
+    enum: RoleType,
+  })
+  @IsNotEmpty()
+  @IsEnum(RoleType)
+  role_type: RoleType;
+
   @ApiProperty({ example: 1 })
   @IsNotEmpty()
   @IsNumber()
-  role_details_id: number;
+  is_active: number;
 
   @ApiProperty({ example: [1, 2, 3] })
   @IsNotEmpty()
-  @IsNumber({}, { each: true })
+  @IsArray()
   module_permission_id: number[];
 }
 
