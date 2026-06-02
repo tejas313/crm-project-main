@@ -91,7 +91,7 @@ export class CreateLeadDto {
   alternate_email: string;
 
   @ApiProperty({
-    example: "SRC123",
+    example: "1",
     description: "Source ID",
     required: true,
   })
@@ -99,7 +99,7 @@ export class CreateLeadDto {
   source_id: any;
 
   @ApiProperty({
-    example: "MED123",
+    example: "1",
     description: "Medium ID",
     required: true,
   })
