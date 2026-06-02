@@ -361,7 +361,7 @@ export class UserService {
   }
 
   // Unified Add or Edit User
-  async addOrEditUser(dto: AddOrEditUserDto) {
+  async addOrEditUser(dto: AddOrEditUserDto, performedByUserId?: number) {
     try {
       let user: User | null = null;
       if (dto.id) {
@@ -417,6 +417,7 @@ export class UserService {
       if (!user) {
         // Add mode
         user = new User();
+        user.created_by = performedByUserId || null;
       }
 
       user.first_name = dto.first_name;
@@ -449,6 +450,7 @@ export class UserService {
 
       if (dto.id) {
         user.modify_at = new Date();
+        user.modify_by = performedByUserId || null;
       }
 
       await this.userRepository.save(user);
@@ -893,6 +895,54 @@ export class UserService {
         };
       }
     } catch (error) {
+      throw error;
+    }
+  }
+
+  async refresh_token(userId: any, sessionId: any) {
+    // const queryRunner = this.dataSource.createQueryRunner();
+    //await queryRunner.connect();
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId, is_deleted: 0 },
+        relations: ["roleDetails"],
+      });
+      if (!user) {
+        throw new NotFoundException("USER_NOT_FOUND");
+      }
+      const payload = {
+        userId: user.id,
+        email: user.email,
+        role: user.roleDetails?.role_type || null,
+        role_id: user.fk_role_id,
+      };
+
+      // Main token
+      const token = await this.jwtService.signAsync(payload);
+
+      const getExpiryDate = (timeStr: string) => {
+        const date = new Date();
+        const value = parseInt(timeStr);
+        if (timeStr.endsWith("h")) date.setHours(date.getHours() + value);
+        else if (timeStr.endsWith("d")) date.setDate(date.getDate() + value);
+        else if (timeStr.endsWith("m"))
+          date.setMinutes(date.getMinutes() + value);
+        else date.setHours(date.getHours() + 20); // default 20h
+        return date;
+      };
+
+      const expiresAt = getExpiryDate(
+        this.configService.get("JWT_EXPIRE_TIME") || "20h"
+      );
+
+      await this.userSessionRepository.update(
+        { id: sessionId },
+        { token: token, expires_at: expiresAt }
+      );
+
+      return { auth_token: token };
+    } catch (error) {
+      // await queryRunner.release();
       throw error;
     }
   }

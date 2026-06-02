@@ -32,6 +32,7 @@ import { Request, Response } from "express";
 import { NonAuthHeader } from "src/guard/nonAuth.guard";
 import { AuthGuard } from "src/guard/auth.guard";
 import { RoleType } from "./entities/role-details.entity";
+import { RefreshGuard } from "src/guard/refresh.guard";
 
 @ApiTags("User")
 @Controller("user")
@@ -108,7 +109,7 @@ export class UserController {
       if (req.user.role !== RoleType.ADMIN) {
         return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
       }
-      const result = await this.userService.addOrEditUser(dto);
+      const result = await this.userService.addOrEditUser(dto, req.user.userId);
 
       return this.responseService.success(res, result.message, result);
     } catch (error: any) {
@@ -359,6 +360,29 @@ export class UserController {
         "LEAVE_LIST_RETRIEVED_SUCCESS",
         result
       );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Get("/refresh_token")
+  @ApiHeader({
+    name: "refresh_token",
+    description: "refresh_token header",
+    required: true,
+  })
+  @UseGuards(RefreshGuard)
+  async refresh_token(@Req() req: Request, @Res() res: Response) {
+    try {
+      const data = await this.userService.refresh_token(
+        req["user"].userId,
+        req["user"].sessionId
+      );
+      this.responseService.success(res, "TOKEN_REFRESHED", data);
     } catch (error: any) {
       if (error.status) {
         this.responseService.error(req, res, error.message, error.status);
