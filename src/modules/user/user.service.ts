@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Not, In } from "typeorm";
+import { Repository, Not, In, Like } from "typeorm";
 import { User } from "./entities/user.entity";
 import { UserSession } from "./entities/user-session.entity";
 import {
@@ -137,15 +137,28 @@ export class UserService {
         new Set(module_permission_id.map((p: any) => Number(p)))
       );
 
-      // Validate that all module_permission_id exist in module_permission table
+      // Validate that all module_permission_id exist in module_permission table and are allowed for this role type
       if (incomingPerms.length > 0) {
+        const role = await this.roleDetailsRepository.findOne({
+          where: { id: resolvedRoleId },
+        });
+
+        const permissionWhere: any = { id: In(incomingPerms), is_deleted: 0 };
+        if (role.role_type === RoleType.ADMIN) {
+          permissionWhere.is_admin_use = 1;
+        } else if (role.role_type === RoleType.MANAGER) {
+          permissionWhere.is_manager_use = 1;
+        } else if (role.role_type === RoleType.AGENT) {
+          permissionWhere.is_agent_use = 1;
+        }
+
         const validPermissions = await this.modulePermissionRepository.find({
-          where: { id: In(incomingPerms), is_deleted: 0 },
+          where: permissionWhere,
         });
 
         if (validPermissions.length !== incomingPerms.length) {
           throw new BadRequestException(
-            "ONE_OR_MORE_MODULE_PERMISSIONS_NOT_FOUND"
+            "ONE_OR_MORE_MODULE_PERMISSIONS_NOT_FOUND_OR_NOT_ALLOWED_FOR_THIS_ROLE_TYPE"
           );
         }
       }
@@ -223,7 +236,7 @@ export class UserService {
     const existingUser = await this.userRepository.findOne({
       where: query,
     });
-
+    console.log("existingUser",existingUser)
     if (existingUser) {
       throw new Error("EMAIL_ALREADY_EXISTS");
     }
@@ -597,8 +610,8 @@ export class UserService {
   ),
   '-'
 ) AS manager`,
-          "users.created_at as created_at",
-          " DATE_FORMAT(users.modify_at, '%Y-%m-%d') AS modify_at",
+          "DATE_FORMAT(users.created_at, '%d/%m/%Y') AS created_at",
+          "DATE_FORMAT(users.modify_at, '%d/%m/%Y') AS modify_at",
           "users.updated_at as updated_at",
         ])
         .where("users.is_deleted = 0")
@@ -734,6 +747,38 @@ export class UserService {
     }
   }
 
+  async getUserCreationDropdown() {
+    try {
+      // 1. Fetch active, non-deleted roles
+      const roles = await this.roleDetailsRepository.find({
+        where: { is_active: 1, is_deleted: 0, role_type: Not(RoleType.ADMIN) },
+        select: ["id", "role_name", "role_type"],
+      });
+
+      // 2. Fetch users with role_type MANAGER
+      const managers = await this.userRepository
+        .createQueryBuilder("user")
+        .leftJoin("user.roleDetails", "roleDetails")
+        .where("roleDetails.role_type = :roleType", {
+          roleType: RoleType.MANAGER,
+        })
+        .andWhere("user.is_active = 1")
+        .andWhere("user.is_deleted = 0")
+        .select([
+          "user.id as id",
+          "CONCAT_WS(' ', user.first_name, user.last_name) as name",
+        ])
+        .getRawMany();
+
+      return {
+        roles,
+        managers,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async getUserRolePermissions(roleId: number) {
     try {
       const role = await this.roleDetailsRepository.findOne({
@@ -743,13 +788,27 @@ export class UserService {
         throw new NotFoundException("ROLE_NOT_FOUND");
       }
 
+      const moduleWhere: any = { is_deleted: 0 };
+      const permissionWhere: any = { is_deleted: 0 };
+
+      if (role.role_type === RoleType.ADMIN) {
+        moduleWhere.is_admin_use = 1;
+        permissionWhere.is_admin_use = 1;
+      } else if (role.role_type === RoleType.MANAGER) {
+        moduleWhere.is_manager_use = 1;
+        permissionWhere.is_manager_use = 1;
+      } else if (role.role_type === RoleType.AGENT) {
+        moduleWhere.is_agent_use = 1;
+        permissionWhere.is_agent_use = 1;
+      }
+
       const [modules, modulePermissions, rolePermissions] = await Promise.all([
         this.moduleRepository.find({
-          where: { is_deleted: 0 },
+          where: moduleWhere,
           order: { id: "ASC" },
         }),
         this.modulePermissionRepository.find({
-          where: { is_deleted: 0 },
+          where: permissionWhere,
           order: { id: "ASC" },
         }),
         roleId
@@ -769,6 +828,9 @@ export class UserService {
           .map((mp) => ({
             id: mp.id,
             name: mp.name,
+            is_admin_use: mp.is_admin_use,
+            is_manager_use: mp.is_manager_use,
+            is_agent_use: mp.is_agent_use,
             is_active: assignedPermissionIds.has(mp.id) ? 1 : 0,
           }));
 
@@ -778,6 +840,9 @@ export class UserService {
 
         return {
           module_name: module.name,
+          is_admin_use: module.is_admin_use,
+          is_manager_use: module.is_manager_use,
+          is_agent_use: module.is_agent_use,
           is_active: isModuleActive,
           role_permission: permissions,
         };
@@ -792,16 +857,30 @@ export class UserService {
     }
   }
 
-  async getPermissionList() {
+  async getPermissionList(roleType?: string) {
     try {
+      const moduleWhere: any = { is_deleted: 0 };
+      const permissionWhere: any = { is_deleted: 0 };
+
+      if (roleType === RoleType.ADMIN) {
+        moduleWhere.is_admin_use = 1;
+        permissionWhere.is_admin_use = 1;
+      } else if (roleType === RoleType.MANAGER) {
+        moduleWhere.is_manager_use = 1;
+        permissionWhere.is_manager_use = 1;
+      } else if (roleType === RoleType.AGENT) {
+        moduleWhere.is_agent_use = 1;
+        permissionWhere.is_agent_use = 1;
+      }
+
       // Get Module/ModulePermission data
       const modules = await this.moduleRepository.find({
-        where: { is_deleted: 0 },
+        where: moduleWhere,
         order: { id: "ASC" },
       });
 
       const modulePermissions = await this.modulePermissionRepository.find({
-        where: { is_deleted: 0 },
+        where: permissionWhere,
         order: { id: "ASC" },
       });
 
@@ -812,11 +891,17 @@ export class UserService {
           .map((mp) => ({
             id: mp.id,
             name: mp.name,
+            is_admin_use: mp.is_admin_use,
+            is_manager_use: mp.is_manager_use,
+            is_agent_use: mp.is_agent_use,
           }));
 
         return {
           id: module.id,
           name: module.name,
+          is_admin_use: module.is_admin_use,
+          is_manager_use: module.is_manager_use,
+          is_agent_use: module.is_agent_use,
           module_permissions: permissions,
         };
       });
@@ -824,6 +909,86 @@ export class UserService {
       return {
         success: true,
         data: moduleList,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getRoleDetailsList(filters: any) {
+    try {
+      const {
+        pageNumber = 1,
+        pageLimit = 10,
+        search,
+        is_active,
+        is_csv,
+      } = filters;
+      const page = Number(pageNumber);
+      const limit = Number(pageLimit);
+      const skip = (page - 1) * limit;
+
+      let query = this.roleDetailsRepository
+        .createQueryBuilder("rd")
+        .leftJoin(
+          "role_permission",
+          "rp",
+          "rp.fk_role_details_id = rd.id AND rp.is_deleted = 0"
+        )
+        .leftJoin(
+          "module_permission",
+          "mp",
+          "mp.id = rp.fk_module_permission_id AND mp.is_deleted = 0"
+        )
+        .select([
+          "rd.id as id",
+          "rd.role_name as role_name",
+          "GROUP_CONCAT(DISTINCT mp.name ORDER BY rp.fk_module_permission_id ASC SEPARATOR ', ') as permissions",
+          "rd.is_active as is_active",
+          "DATE_FORMAT(rd.created_at, '%d/%m/%Y') as created_at",
+        ])
+        .where("rd.is_deleted = 0")
+        .groupBy("rd.id");
+
+      if (search) {
+        query = query.andWhere("rd.role_name LIKE :search", {
+          search: `%${search}%`,
+        });
+      }
+
+      if (is_active !== undefined) {
+        query = query.andWhere("rd.is_active = :is_active", { is_active });
+      }
+
+      query = query.orderBy("rd.id", "ASC");
+
+      if (is_csv == 1) {
+        const rawData = await query.getRawMany();
+        return {
+          success: true,
+          data: { csvdata: rawData },
+        };
+      }
+      const [rawData, count] = await Promise.all([
+        query.limit(limit).offset(skip).getRawMany(),
+        this.roleDetailsRepository.count({
+          where: {
+            is_deleted: 0,
+            ...(search && { role_name: Like(`%${search}%`) }),
+            ...(is_active !== undefined && { is_active }),
+          },
+        }),
+      ]);
+
+      const totalPages = Math.ceil(count / limit);
+
+      return {
+        success: true,
+        data: rawData,
+        total_count: count,
+        current_page: page,
+        total_pages: totalPages,
+        per_page: limit,
       };
     } catch (error) {
       throw error;

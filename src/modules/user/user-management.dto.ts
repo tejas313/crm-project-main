@@ -256,12 +256,11 @@ export class UserListFiltersDto {
   @IsEnum([RoleType.MANAGER, RoleType.AGENT])
   role?: RoleType;
 
-  @ApiProperty({ required: false, enum: ["Active", "Blocked"] })
+  @ApiProperty({ required: false, example: 1 })
   @IsOptional()
-  @IsString()
-  status?: "Active" | "Blocked";
+  status?: number;
 
-  @ApiProperty({ required: false })
+  @ApiProperty({ required: false,example:1 })
   @IsOptional()
   is_csv?: number;
 }
@@ -271,4 +270,27 @@ export class UserByIdDto {
   @IsNotEmpty()
   @IsNumber()
   id: number;
+}
+
+export class RoleListFiltersDto {
+  @ApiProperty({ example: 1, required: false })
+  @IsOptional()
+  pageNumber?: number;
+
+  @ApiProperty({ example: 10, required: false })
+  @IsOptional()
+  pageLimit?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ required: false, example: 1 })
+  @IsOptional()
+  is_active?: number;
+
+  @ApiProperty({ required: false, example: 1 })
+  @IsOptional()
+  is_csv?: number;
 }

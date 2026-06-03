@@ -29,6 +29,15 @@ export class ModulePermission {
   @Column({ name: "is_deleted", type: "smallint", default: 0 })
   is_deleted: number;
 
+  @Column({ name: "is_admin_use", type: "smallint", default: 0 })
+  is_admin_use: number;
+
+  @Column({ name: "is_manager_use", type: "smallint", default: 0 })
+  is_manager_use: number;
+
+  @Column({ name: "is_agent_use", type: "smallint", default: 0 })
+  is_agent_use: number;
+
   @CreateDateColumn({ name: "created_at" })
   created_at: Date;
 

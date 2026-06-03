@@ -13,12 +13,13 @@ import { RoleDetails } from "./role-details.entity";
 @Entity("users")
 @Index(["is_active"])
 @Index(["fk_role_id"])
+@Index(["email"])
 @Index(["last_login_at"])
 export class User {
   @PrimaryGeneratedColumn({ type: "int" })
   id: number;
 
-  @Column({ type: "varchar", length: 255, unique: true, nullable: false })
+  @Column({ type: "varchar", length: 255, nullable: false })
   email: string;
 
   @Column({ name: "first_name", length: 255, type: "varchar", nullable: false })

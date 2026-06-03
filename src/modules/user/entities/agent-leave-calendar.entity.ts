@@ -12,9 +12,10 @@ import { User } from "./user.entity";
 
 export enum LeaveType {
   PAID_LEAVE = "Paid Leave",
-  SICK = "Sick",
-  CASUAL = "Casual",
-  UNPAID = "Unpaid",
+  SICK = "Sick Leave",
+  CASUAL = "Casual Leave",
+  UNPAID = "Unpaid Leave",
+  CompOff = "Comp off",
 }
 
 @Entity("agent_leave_calendar")

@@ -15,6 +15,7 @@ import {
   ApiResponse,
   ApiHeader,
   ApiBearerAuth,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { UserService } from "./user.service";
 import { LoginDto } from "./login.dto";
@@ -26,6 +27,7 @@ import {
   AddOrEditUserDto,
   UserListFiltersDto,
   UserByIdDto,
+  RoleListFiltersDto,
 } from "./user-management.dto";
 import { ResponseService } from "../../common/response.service";
 import { Request, Response } from "express";
@@ -176,12 +178,29 @@ export class UserController {
     }
   }
 
+  @Get("getUserCreationDropdown")
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth("authorization")
+  async addUserCreationDropdown(@Req() req: any, @Res() res: Response) {
+    try {
+      const result = await this.userService.getUserCreationDropdown();
+      return this.responseService.success(
+        res,
+        "DROPDOWN_DATA_RETRIEVED_SUCCESS",
+        result
+      );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
   @Get("getUserList")
   @UseGuards(AuthGuard)
   @ApiBearerAuth("authorization")
-  @ApiOperation({
-    summary: "Get User List with pagination, filters, and counts (Admin only)",
-  })
   async getUserList(
     @Query() query: UserListFiltersDto,
     @Req() req: any,
@@ -206,12 +225,11 @@ export class UserController {
     }
   }
 
-  @Get("getUserDetailsById")
+  @Get("getRoleDetailsList")
   @UseGuards(AuthGuard)
   @ApiBearerAuth("authorization")
-  @ApiOperation({ summary: "Get User Details by ID (Admin only)" })
-  async getUserDetailsById(
-    @Query("id") id: string,
+  async getRoleDetailsList(
+    @Query() query: RoleListFiltersDto,
     @Req() req: any,
     @Res() res: Response
   ) {
@@ -219,6 +237,30 @@ export class UserController {
       if (req.user.role !== RoleType.ADMIN) {
         return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
       }
+      const result = await this.userService.getRoleDetailsList(query);
+      return this.responseService.success(
+        res,
+        "ROLE_LIST_RETRIEVED_SUCCESS",
+        result
+      );
+    } catch (error: any) {
+      if (error.status) {
+        this.responseService.error(req, res, error.message, error.status);
+      } else {
+        this.responseService.error(req, res, error.message);
+      }
+    }
+  }
+
+  @Get("getUserDetailsById")
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth("authorization")
+  async getUserDetailsById(
+    @Query("id") id: string,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
+    try {
       const result = await this.userService.getUserDetailsById(Number(id));
       return this.responseService.success(
         res,
@@ -237,15 +279,17 @@ export class UserController {
   @Get("getPermissionList")
   @UseGuards(AuthGuard)
   @ApiBearerAuth("authorization")
-  @ApiOperation({
-    summary: "Get Hierarchical List of Permissions (Admin only)",
-  })
-  async getPermissionList(@Req() req: any, @Res() res: Response) {
+  @ApiQuery({ name: "role_type", required: false, enum: RoleType })
+  async getPermissionList(
+    @Query("role_type") role_type: string,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
     try {
       if (req.user.role !== RoleType.ADMIN) {
         return this.responseService.error(req, res, "FORBIDDEN_ACCESS", 403);
       }
-      const result = await this.userService.getPermissionList();
+      const result = await this.userService.getPermissionList(role_type);
       return this.responseService.success(
         res,
         "PERMISSION_LIST_RETRIEVED_SUCCESS",
@@ -263,7 +307,6 @@ export class UserController {
   @Get("getUserRolePermissions")
   @UseGuards(AuthGuard)
   @ApiBearerAuth("authorization")
-  @ApiOperation({ summary: "Get User Role Permissions (Admin only)" })
   async getUserRolePermissions(
     @Query("id") id: string,
     @Req() req: any,
@@ -343,7 +386,6 @@ export class UserController {
   @Get("getLeaveList")
   @UseGuards(AuthGuard)
   @ApiBearerAuth("authorization")
-  @ApiOperation({ summary: "Get Leave List based on Role" })
   async getLeaveList(
     @Query() query: LeaveListDto,
     @Req() req: any,
